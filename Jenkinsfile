@@ -1,21 +1,19 @@
 pipeline {
     agent {
         docker {
-            image 'jenkins-agent-docker:latest' // השם של ה-agent שהכנת
+            image 'nofarpanker/jenkins-docker-agent:latest'
             args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
         }
-    }
-
-    environment {
-        DOCKER_USER = credentials('docker-hub-creds') // מזהה ה-Credentials שיצרת ב-Jenkins
-        DOCKER_PASS = credentials('docker-hub-creds')
-        APP_VERSION = "latest" // אפשר להחליף ב-BUILD_NUMBER או Git commit hash
     }
 
     options {
         buildDiscarder(logRotator(daysToKeepStr: '30'))
         disableConcurrentBuilds()
         timestamps()
+    }
+
+    environment {
+        DOCKER_IMAGE = "nofarpanker/luxe-jewelry-store"
     }
 
     stages {
@@ -25,17 +23,16 @@ pipeline {
             }
         }
 
-        stage('Build Docker Images') {
+        stage('Build App') {
             steps {
-                script {
-                    def services = ['auth', 'backend', 'front']
-                    for (service in services) {
-                        sh """
-                            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                            docker build -t nofarpanker/luxe-jewelry-store-${service}:${APP_VERSION} ${service}-service/
-                            docker push nofarpanker/luxe-jewelry-store-${service}:${APP_VERSION}
-                        """
-                    }
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        docker login -u $DOCKER_USER -p $DOCKER_PASS
+                        docker build -t $DOCKER_IMAGE:${BUILD_NUMBER} .
+                        docker tag $DOCKER_IMAGE:${BUILD_NUMBER} $DOCKER_IMAGE:latest
+                        docker push $DOCKER_IMAGE:${BUILD_NUMBER}
+                        docker push $DOCKER_IMAGE:latest
+                    '''
                 }
             }
         }
@@ -44,12 +41,11 @@ pipeline {
     post {
         always {
             echo "Cleaning up local Docker images..."
-            script {
-                def services = ['auth', 'backend', 'front']
-                for (service in services) {
-                    sh "docker rmi nofarpanker/luxe-jewelry-store-${service}:${APP_VERSION} || true"
-                }
-            }
+            sh '''
+                docker rmi $DOCKER_IMAGE:${BUILD_NUMBER} || true
+                docker rmi $DOCKER_IMAGE:latest || true
+            '''
         }
     }
 }
+
