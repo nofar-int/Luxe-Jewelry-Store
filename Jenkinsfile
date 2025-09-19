@@ -1,7 +1,7 @@
 pipeline {
     agent {
         docker {
-            image 'docker.io/nofarpanker/jenkins-docker-agent:latest'
+            image 'nofarpanker/jenkins-docker-agent:latest'
             args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
@@ -13,45 +13,45 @@ pipeline {
     }
 
     environment {
-        DOCKER_REGISTRY = 'docker.io'
-        DOCKER_IMAGE = 'nofarpanker/luxe-jewelry-store'
-        DOCKER_TAG = "${env.BUILD_NUMBER}"
+        DOCKERHUB_CREDENTIALS = 'docker-hub-creds'
+        IMAGE_NAME = 'nofarpanker/luxe-jewelry-store'
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
 
     stages {
-        stage('Checkout') {
+
+        stage('Checkout Code') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Build App Docker Image') {
+        stage('Build Docker Image') {
             steps {
-                sh '''
-                    docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD $DOCKER_REGISTRY
-                    docker build -t $DOCKER_IMAGE:$DOCKER_TAG .
-                    docker tag $DOCKER_IMAGE:$DOCKER_TAG $DOCKER_IMAGE:latest
-                '''
+                sh """
+                    docker login --username \$DOCKERHUB_USERNAME --password \$DOCKERHUB_PASSWORD
+                    docker build -t \$IMAGE_NAME:\$IMAGE_TAG .
+                """
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                sh '''
-                    docker push $DOCKER_IMAGE:$DOCKER_TAG
-                    docker push $DOCKER_IMAGE:latest
-                '''
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+                    sh """
+                        docker login -u \$DOCKERHUB_USERNAME -p \$DOCKERHUB_PASSWORD
+                        docker push \$IMAGE_NAME:\$IMAGE_TAG
+                    """
+                }
             }
         }
+
     }
 
     post {
         always {
-            sh '''
-                docker rmi $DOCKER_IMAGE:$DOCKER_TAG || true
-                docker rmi $DOCKER_IMAGE:latest || true
-            '''
+            echo 'Cleaning up local Docker images...'
+            sh 'docker system prune -af'
         }
     }
 }
-
