@@ -1,43 +1,50 @@
 pipeline {
-    agent { label 'jenkins-agent' }
+    agent any
 
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git', branch: 'main'
             }
         }
 
         stage('Build Frontend Docker Image') {
             steps {
-                dir('infra') {
-                    sh 'docker build -t nofar-int/luxe-jewelry-store-front:latest -f Dockerfile.frontend .'
+                echo 'Building Frontend Docker image...'
+                dir("${env.WORKSPACE}") {
+                    sh 'docker build -t nofar-int/luxe-jewelry-store-front:latest -f infra/Dockerfile.frontend .'
                 }
             }
         }
 
         stage('Build Backend Docker Image') {
             steps {
-                dir('infra') {
-                    sh 'docker build -t nofar-int/luxe-jewelry-store-backend:latest -f Dockerfile.backend .'
+                echo 'Building Backend Docker image...'
+                dir("${env.WORKSPACE}") {
+                    sh 'docker build -t nofar-int/luxe-jewelry-store-backend:latest -f infra/Dockerfile.backend .'
                 }
             }
         }
 
         stage('Build Auth Docker Image') {
             steps {
-                dir('infra') {
-                    sh 'docker build -t nofar-int/luxe-jewelry-store-auth:latest -f Dockerfile.auth .'
+                echo 'Building Auth Docker image...'
+                dir("${env.WORKSPACE}") {
+                    sh 'docker build -t nofar-int/luxe-jewelry-store-auth:latest -f infra/Dockerfile.auth .'
                 }
             }
         }
 
         stage('Optional: Push Docker Images') {
             steps {
-                echo "Optional: Push images to Docker Hub or registry"
+                echo 'Pushing Docker images...'
+                sh 'docker push nofar-int/luxe-jewelry-store-front:latest'
+                sh 'docker push nofar-int/luxe-jewelry-store-backend:latest'
+                sh 'docker push nofar-int/luxe-jewelry-store-auth:latest'
             }
         }
     }
 }
+
 
 
