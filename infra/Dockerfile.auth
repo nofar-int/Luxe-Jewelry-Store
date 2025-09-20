@@ -1,0 +1,15 @@
+FROM python:3.11-slim
+WORKDIR /app
+
+# להעתיק רק requirements תחילה כדי לנצל cache
+COPY auth-service/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# להעתיק את שאר הקוד
+COPY auth-service/ .
+
+EXPOSE 8001
+ENV PYTHONUNBUFFERED=1
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+

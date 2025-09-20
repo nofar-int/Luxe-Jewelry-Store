@@ -1,0 +1,26 @@
+# ===========================
+# שלב הבנייה (Build Stage)
+# ===========================
+FROM node:18 AS build
+WORKDIR /app
+
+# העתקת package.json ו-package-lock.json
+COPY jewelry-store/package*.json ./
+
+# התקנת dependencies
+RUN npm install
+
+# העתקת שאר הקוד
+COPY jewelry-store/ .
+
+# בניית האפליקציה ל־production
+RUN npm run build
+
+# ===========================
+# שלב ההרצה (Runtime Stage - Nginx)
+# ===========================
+FROM nginx:alpine
+
+# העתקת תיקיית build ל־Nginx
+COPY --from=build /app/build /us
+

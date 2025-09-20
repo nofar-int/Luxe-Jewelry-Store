@@ -1,37 +1,47 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'nofarpanker/jenkins-agent:latest'  // החליפי בתגית האמיתית שלך
+            args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
+
+    options {
+        buildDiscarder(logRotator(daysToKeepStr: '30'))
+        disableConcurrentBuilds()
+        timestamps()
+    }
 
     environment {
-        // שנה לפי שם המשתמש וה־tag שלך ב־Docker Hub
-        DOCKER_IMAGE = "nofarpanker/luxe-jewelry-store:latest"
+        DOCKER_HUB = 'nofarpanker'                 // שם המשתמש שלך ב-Docker Hub
+        IMAGE_TAG  = "${env.GIT_COMMIT.take(7)}"   // אפשר גם BUILD_NUMBER
     }
 
     stages {
-
         stage('Checkout Code') {
             steps {
                 git branch: 'main', url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build & Push Docker Images') {
             steps {
-                script {
-                    // בונה את ה-Image
-                    sh "docker build -t ${DOCKER_IMAGE} ."
-                }
-            }
-        }
+                // שימוש ב-Credentials של Jenkins
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', 
+                                                  passwordVariable: 'DOCKER_HUB_PASSWORD', 
+                                                  usernameVariable: 'DOCKER_HUB_USER')]) {
+                    sh '''
+                        echo "Logging in to Docker Hub"
+                        docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD
 
-        stage('Push Docker Image') {
-            steps {
-                script {
-                    // מחבר ל-Docker Hub
-                    // החליפי USERNAME ו-PASSWORD ב-Credentials ב-Jenkins
-                    withCredentials([usernamePassword(credentialsId: 'docker-hub', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                        sh "echo $PASSWORD | docker login -u $USERNAME --password-stdin"
-                        sh "docker push ${DOCKER_IMAGE}"
-                    }
+                        for svc in auth backend front; do
+                            echo "Building image for $svc"
+                            docker build -t $DOCKER_HUB/${svc}:latest ./infra/$svc
+                            docker tag $DOCKER_HUB/${svc}:latest $DOCKER_HUB/${svc}:$IMAGE_TAG
+                            docker push $DOCKER_HUB/${svc}:latest
+                            docker push $DOCKER_HUB/${svc}:$IMAGE_TAG
+                        done
+                    '''
                 }
             }
         }
@@ -39,15 +49,8 @@ pipeline {
 
     post {
         always {
-            echo "Cleaning up local Docker images..."
-            sh "docker system prune -af || true"
-        }
-        success {
-            echo "Pipeline finished successfully!"
-        }
-        failure {
-            echo "Pipeline failed."
+            // ניקוי Docker artifacts אחרי כל build
+            sh 'docker system prune -af'
         }
     }
 }
-

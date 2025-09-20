@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  auth:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.auth
+    container_name: auth-service
+    ports:
+      - "8001:8001"
+
+  backend:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.backend
+    container_name: backend-service
+    ports:
+      - "8000:8000"
+    depends_on:
+      - auth
+
+  front:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.frontend
+    container_name: frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+
