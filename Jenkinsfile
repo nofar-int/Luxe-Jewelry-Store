@@ -22,16 +22,19 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
+                // הריפו ציבורי, אין צורך ב-credentials
                 checkout scm
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh """
-                    docker login --username \$DOCKERHUB_USERNAME --password \$DOCKERHUB_PASSWORD
-                    docker build -t \$IMAGE_NAME:\$IMAGE_TAG .
-                """
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+                    sh """
+                        docker login -u \$DOCKERHUB_USERNAME -p \$DOCKERHUB_PASSWORD
+                        docker build -t \$IMAGE_NAME:\$IMAGE_TAG .
+                    """
+                }
             }
         }
 
@@ -55,3 +58,4 @@ pipeline {
         }
     }
 }
+
