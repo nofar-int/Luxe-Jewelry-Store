@@ -1,76 +1,61 @@
 pipeline {
     agent { label 'jenkins-agent' }
-
+    
     environment {
-        DOCKER_REGISTRY = "nofar-int"
-        FRONT_IMAGE = "${DOCKER_REGISTRY}/luxe-jewelry-store-front:latest"
-        BACK_IMAGE = "${DOCKER_REGISTRY}/luxe-jewelry-store-backend:latest"
-        AUTH_IMAGE = "${DOCKER_REGISTRY}/luxe-jewelry-store-auth:latest"
+        FRONT_IMAGE = 'nofar-int/luxe-jewelry-store-front:latest'
+        BACK_IMAGE  = 'nofar-int/luxe-jewelry-store-backend:latest'
+        AUTH_IMAGE  = 'nofar-int/luxe-jewelry-store-auth:latest'
     }
-
+    
     stages {
-
         stage('Checkout') {
             steps {
                 echo 'Checking out the code...'
                 checkout scm
             }
         }
-
+        
         stage('Build Frontend Docker Image') {
             steps {
                 echo 'Building Frontend Docker image...'
-                dir('jewelry-store') {
-                    sh 'docker build -t $FRONT_IMAGE .'
+                dir('infra') {
+                    sh "docker build -t ${env.FRONT_IMAGE} -f Dockerfile.frontend ."
                 }
             }
         }
-
+        
         stage('Build Backend Docker Image') {
             steps {
                 echo 'Building Backend Docker image...'
-                dir('backend') {
-                    sh 'docker build -t $BACK_IMAGE .'
+                dir('infra') {
+                    sh "docker build -t ${env.BACK_IMAGE} -f Dockerfile.backend ."
                 }
             }
         }
-
+        
         stage('Build Auth Docker Image') {
             steps {
                 echo 'Building Auth Docker image...'
-                dir('auth-service') {
-                    sh 'docker build -t $AUTH_IMAGE .'
+                dir('infra') {
+                    sh "docker build -t ${env.AUTH_IMAGE} -f Dockerfile.auth ."
                 }
             }
         }
-
-        stage('Run Tests (Optional)') {
+        
+        stage('Optional: Push Docker Images') {
             steps {
-                echo 'Running tests...'
-                // כאן אפשר להריץ את בדיקות האפליקציה
-            }
-        }
-
-        stage('Push Docker Images (Optional)') {
-            steps {
-                echo 'Pushing Docker images to registry...'
-                sh 'docker push $FRONT_IMAGE'
-                sh 'docker push $BACK_IMAGE'
-                sh 'docker push $AUTH_IMAGE'
+                echo 'Pushing Docker images (optional)...'
+                sh "docker push ${env.FRONT_IMAGE} || true"
+                sh "docker push ${env.BACK_IMAGE} || true"
+                sh "docker push ${env.AUTH_IMAGE} || true"
             }
         }
     }
-
+    
     post {
         always {
-            echo 'Cleaning up...'
+            echo 'Pipeline finished.'
             sh 'docker images'
-        }
-        success {
-            echo 'Pipeline succeeded!'
-        }
-        failure {
-            echo 'Pipeline failed!'
         }
     }
 }
