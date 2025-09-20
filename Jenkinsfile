@@ -32,3 +32,36 @@ pipeline {
         stage('Build Auth Docker Image') {
             steps {
                 echo 'Building Auth Docker image...'
+                sh 'docker build -t $AUTH_IMAGE ./auth-service'
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                echo 'Running tests...'
+                // כאן אפשר להוסיף פקודות בדיקה אם יש
+            }
+        }
+
+        stage('Deploy (Optional)') {
+            steps {
+                echo 'Deploying...'
+                // כאן אפשר להוסיף פקודות לפריסה
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Cleaning up...'
+            sh 'docker ps -a'
+            sh 'docker images'
+        }
+        success {
+            echo 'Pipeline succeeded!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
