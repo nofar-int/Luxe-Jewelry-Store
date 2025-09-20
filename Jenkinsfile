@@ -1,55 +1,57 @@
 pipeline {
-    agent none  // ברמת ה-pipeline אין node כברירת מחדל
+    agent { label 'jenkins-agent' }
+
+    environment {
+        FRONT_IMAGE = 'nofar-int/luxe-jewelry-store-front:latest'
+        BACK_IMAGE  = 'nofar-int/luxe-jewelry-store-backend:latest'
+        AUTH_IMAGE  = 'nofar-int/luxe-jewelry-store-auth:latest'
+    }
 
     stages {
         stage('Checkout') {
-            agent { label 'jenkins-agent' }
             steps {
-                echo 'Checking out source code...'
-                checkout scm
+                echo "Checking out source code..."
+                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git', branch: 'main'
             }
         }
 
         stage('Build Frontend Docker Image') {
-            agent { label 'jenkins-agent' }
             steps {
-                echo 'Building Frontend Docker image...'
+                echo "Building Frontend Docker image..."
                 dir('.') {
-                    sh 'docker build -t nofar-int/luxe-jewelry-store-front:latest -f infra/Dockerfile.frontend .'
+                    sh 'docker build -t $FRONT_IMAGE -f infra/Dockerfile.frontend .'
                 }
             }
         }
 
         stage('Build Backend Docker Image') {
-            agent { label 'jenkins-agent' }
             steps {
-                echo 'Building Backend Docker image...'
+                echo "Building Backend Docker image..."
                 dir('.') {
-                    sh 'docker build -t nofar-int/luxe-jewelry-store-backend:latest -f infra/Dockerfile.backend .'
+                    sh 'docker build -t $BACK_IMAGE -f infra/Dockerfile.backend .'
                 }
             }
         }
 
         stage('Build Auth Docker Image') {
-            agent { label 'jenkins-agent' }
             steps {
-                echo 'Building Auth Docker image...'
+                echo "Building Auth Docker image..."
                 dir('.') {
-                    sh 'docker build -t nofar-int/luxe-jewelry-store-auth:latest -f infra/Dockerfile.auth .'
+                    sh 'docker build -t $AUTH_IMAGE -f infra/Dockerfile.auth .'
                 }
             }
         }
 
         stage('Optional: Push Docker Images') {
-            agent { label 'jenkins-agent' }
             steps {
-                echo 'Pushing images to Docker Hub...'
-                sh '''
-                    docker push nofar-int/luxe-jewelry-store-front:latest
-                    docker push nofar-int/luxe-jewelry-store-backend:latest
-                    docker push nofar-int/luxe-jewelry-store-auth:latest
-                '''
+                echo "Skipping push (public repo) – can add docker push here if needed."
             }
+        }
+    }
+
+    post {
+        always {
+            echo "Pipeline finished."
         }
     }
 }
