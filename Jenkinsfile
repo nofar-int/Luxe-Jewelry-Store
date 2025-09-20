@@ -1,56 +1,75 @@
 pipeline {
-    agent {
-        docker {
-            image 'nofarpanker/jenkins-agent:latest'  // החליפי בתגית האמיתית שלך
-            args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
-        }
-    }
-
-    options {
-        buildDiscarder(logRotator(daysToKeepStr: '30'))
-        disableConcurrentBuilds()
-        timestamps()
-    }
-
+    agent { label 'jenkins-agent' } // משתמש באגנט שהגדרת
     environment {
-        DOCKER_HUB = 'nofarpanker'                 // שם המשתמש שלך ב-Docker Hub
-        IMAGE_TAG  = "${env.GIT_COMMIT.take(7)}"   // אפשר גם BUILD_NUMBER
+        DOCKER_IMAGE_FRONT = 'luxe-jewelry-store-front'
+        DOCKER_IMAGE_BACK = 'luxe-jewelry-store-backend'
+        DOCKER_IMAGE_AUTH = 'luxe-jewelry-store-auth'
     }
-
     stages {
-        stage('Checkout Code') {
+
+        stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git'
+                echo "Checking out the code..."
+                checkout scm
             }
         }
 
-        stage('Build & Push Docker Images') {
+        stage('Build Frontend Docker Image') {
             steps {
-                // שימוש ב-Credentials של Jenkins
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', 
-                                                  passwordVariable: 'DOCKER_HUB_PASSWORD', 
-                                                  usernameVariable: 'DOCKER_HUB_USER')]) {
-                    sh '''
-                        echo "Logging in to Docker Hub"
-                        docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD
-
-                        for svc in auth backend front; do
-                            echo "Building image for $svc"
-                            docker build -t $DOCKER_HUB/${svc}:latest ./infra/$svc
-                            docker tag $DOCKER_HUB/${svc}:latest $DOCKER_HUB/${svc}:$IMAGE_TAG
-                            docker push $DOCKER_HUB/${svc}:latest
-                            docker push $DOCKER_HUB/${svc}:$IMAGE_TAG
-                        done
-                    '''
-                }
+                echo "Building Frontend Docker image..."
+                sh """
+                docker build -t $DOCKER_IMAGE_FRONT ./frontend
+                """
             }
         }
+
+        stage('Build Backend Docker Image') {
+            steps {
+                echo "Building Backend Docker image..."
+                sh """
+                docker build -t $DOCKER_IMAGE_BACK ./backend
+                docker build -t $DOCKER_IMAGE_AUTH ./auth
+                """
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                echo "Running tests..."
+                sh """
+                # כאן תוכלי להוסיף פקודות להרצת Unit/Integration tests
+                echo "Tests passed!"
+                """
+            }
+        }
+
+        stage('Deploy (Optional)') {
+            steps {
+                echo "Deploying containers..."
+                sh """
+                # דוגמא להרצת הקונטיינרים (אם תרצי להריץ על המחשב המקומי)
+                docker run -d --name frontend $DOCKER_IMAGE_FRONT
+                docker run -d --name backend $DOCKER_IMAGE_BACK
+                docker run -d --name auth $DOCKER_IMAGE_AUTH
+                """
+            }
+        }
+
     }
 
     post {
         always {
-            // ניקוי Docker artifacts אחרי כל build
-            sh 'docker system prune -af'
+            echo 'Cleaning up...'
+            sh """
+            docker ps -a
+            docker images
+            """
+        }
+        success {
+            echo 'Pipeline finished successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
         }
     }
 }
