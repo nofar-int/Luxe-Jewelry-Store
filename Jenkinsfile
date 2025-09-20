@@ -1,10 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'nofarpanker/jenkins-docker-agent:latest'
-            args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
-        }
-    }
+    agent any
 
     options {
         buildDiscarder(logRotator(daysToKeepStr: '30'))
@@ -13,7 +8,6 @@ pipeline {
     }
 
     environment {
-        DOCKERHUB_CREDENTIALS = 'docker-hub-creds'
         IMAGE_NAME = 'nofarpanker/luxe-jewelry-store'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
@@ -22,16 +16,14 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                // הריפו ציבורי, אין צורך ב-credentials
                 checkout scm
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+                script {
                     sh """
-                        docker login -u \$DOCKERHUB_USERNAME -p \$DOCKERHUB_PASSWORD
                         docker build -t \$IMAGE_NAME:\$IMAGE_TAG .
                     """
                 }
@@ -40,9 +32,8 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+                script {
                     sh """
-                        docker login -u \$DOCKERHUB_USERNAME -p \$DOCKERHUB_PASSWORD
                         docker push \$IMAGE_NAME:\$IMAGE_TAG
                     """
                 }
