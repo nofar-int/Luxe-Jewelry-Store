@@ -1,57 +1,79 @@
 pipeline {
-    agent { label 'jenkins-agent' }
+    agent any
 
     environment {
-        FRONT_IMAGE = 'nofar-int/luxe-jewelry-store-front:latest'
-        BACK_IMAGE  = 'nofar-int/luxe-jewelry-store-backend:latest'
-        AUTH_IMAGE  = 'nofar-int/luxe-jewelry-store-auth:latest'
+        // כאן אפשר להגדיר משתנים כלליים אם צריך
+        WORKSPACE_PATH = "${env.WORKSPACE}"
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                echo "Checking out source code..."
-                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git', branch: 'main'
-            }
-        }
 
-        stage('Build Frontend Docker Image') {
+        stage('Prepare Workspace') {
             steps {
-                echo "Building Frontend Docker image..."
-                dir('.') {
-                    sh 'docker build -t $FRONT_IMAGE -f infra/Dockerfile.frontend .'
+                script {
+                    // מוסיפים את תיקיית העבודה ל-safe.directory
+                    sh "git config --global --add safe.directory ${WORKSPACE_PATH}"
+                    echo "Configured safe.directory for Git"
                 }
             }
         }
 
-        stage('Build Backend Docker Image') {
+        stage('Checkout SCM') {
             steps {
-                echo "Building Backend Docker image..."
-                dir('.') {
-                    sh 'docker build -t $BACK_IMAGE -f infra/Dockerfile.backend .'
+                checkout scm
+            }
+        }
+
+        stage('Build Frontend') {
+            steps {
+                dir('frontend') {
+                    sh '''
+                    npm install
+                    npm run build
+                    '''
                 }
             }
         }
 
-        stage('Build Auth Docker Image') {
+        stage('Build Backend') {
             steps {
-                echo "Building Auth Docker image..."
-                dir('.') {
-                    sh 'docker build -t $AUTH_IMAGE -f infra/Dockerfile.auth .'
+                dir('backend-service') {
+                    sh '''
+                    pip install -r requirements.txt
+                    # לדוגמה: להריץ build או migrations אם צריך
+                    '''
                 }
             }
         }
 
-        stage('Optional: Push Docker Images') {
+        stage('Run Tests') {
             steps {
-                echo "Skipping push (public repo) – can add docker push here if needed."
+                dir('backend-service') {
+                    sh '''
+                    # להריץ את הבדיקות
+                    pytest
+                    '''
+                }
+            }
+        }
+
+        stage('Post Actions') {
+            steps {
+                echo "Pipeline finished successfully!"
             }
         }
     }
 
     post {
         always {
-            echo "Pipeline finished."
+            echo "Cleaning up workspace..."
+            cleanWs()
+        }
+        success {
+            echo "Pipeline completed successfully!"
+        }
+        failure {
+            echo "Pipeline failed!"
         }
     }
 }
