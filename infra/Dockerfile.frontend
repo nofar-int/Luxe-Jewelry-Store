@@ -22,5 +22,12 @@ RUN npm run build
 FROM nginx:alpine
 
 # העתקת תיקיית build ל־Nginx
-COPY --from=build /app/build /us
+COPY --from=build /app/build /usr/share/nginx/html
+
+# חשיפת פורט 80
+EXPOSE 80
+
+# הפעלת Nginx
+CMD ["nginx", "-g", "daemon off;"]
+
 
