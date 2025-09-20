@@ -2,8 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = 'nofarpanker/luxe-jewelry-store'
-        IMAGE_TAG = "${env.BUILD_NUMBER}"
+        DOCKER_IMAGE = "nofarpanker/luxe-jewelry-store:latest"
     }
 
     stages {
@@ -15,17 +14,18 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh """
-                    docker build -t $IMAGE_NAME:$IMAGE_TAG .
-                """
+                script {
+                    sh "docker build -t ${DOCKER_IMAGE} ."
+                }
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                sh """
-                    docker push $IMAGE_NAME:$IMAGE_TAG
-                """
+                script {
+                    sh "docker login -u $DOCKER_HUB_USERNAME -p $DOCKER_HUB_PASSWORD"
+                    sh "docker push ${DOCKER_IMAGE}"
+                }
             }
         }
     }
@@ -33,8 +33,13 @@ pipeline {
     post {
         always {
             echo 'Cleaning up local Docker images...'
-            sh 'docker system prune -af'
+            sh "docker system prune -af"
+        }
+        success {
+            echo 'Pipeline finished successfully!'
+        }
+        failure {
+            echo 'Pipeline failed.'
         }
     }
 }
-
