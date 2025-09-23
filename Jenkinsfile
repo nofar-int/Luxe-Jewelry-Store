@@ -1,31 +1,37 @@
 pipeline {
-    agent {
-        docker {
-            image 'nofarpanker/jenkins-agent:latest'
-            args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
-        }
+    agent any
+
+    environment {
+        DOCKER_HUB_CREDENTIALS = credentials('docker-hub-credentials-id') // החליפי ב-ID של קרדנציאל הדוקר
+        DOCKER_IMAGE_NAME = "nofarpanker/jenkins-agent" // או כל אימג' אחר שלך
     }
+
     stages {
-        stage('Build app') {
+        stage('Checkout') {
             steps {
-                sh '''
-                   docker login --username nofarpanker --password-stdin <<EOF
-                   <PASTE_YOUR_TOKEN_HERE>
-                   EOF
-                   docker build -t nofarpanker/my-app:latest .
-                   docker push nofarpanker/my-app:latest
-                '''
+                git credentialsId: 'github-credentials-id', url: 'https://github.com/nofarpanker/your-repo.git'
             }
         }
-    }
-    options {
-        buildDiscarder(daysToKeepStr: '30')
-        disableConcurrentBuilds()
-        timestamps()
-    }
-    post {
-        always {
-            sh 'docker image prune -f'
+
+        stage('Build Frontend') {
+            steps {
+                sh 'docker build -t luxe-jewelry-store-front:latest -f Dockerfile .'
+            }
+        }
+
+        stage('Build Agent Image') {
+            steps {
+                sh 'docker build -t jenkins-agent:latest -f Dockerfile.agent .'
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials-id', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh 'docker push $DOCKER_IMAGE_NAME:latest'
+                }
+            }
         }
     }
 }
