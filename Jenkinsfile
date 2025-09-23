@@ -2,16 +2,16 @@ pipeline {
     agent any
 
     environment {
-        // Docker Hub credentials
-        DOCKER_HUB_CREDENTIALS = credentials('docker-hub-nofarpanker')
-        DOCKER_IMAGE_NAME = "nofarpanker/jenkins-agent"
+        DOCKER_HUB_CREDENTIALS = credentials('docker-hub-nofarpanker') // Docker Hub
+        DOCKER_IMAGE_NAME = "nofarpanker/jenkins-agent" // או כל אימג' אחר שלך
     }
 
     stages {
         stage('Checkout') {
             steps {
-                // GitHub checkout עם הקרדנשיאל הנכון
-                git credentialsId: 'github-credentials-id', url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git'
+                git credentialsId: 'github-credentials-id', 
+                    url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git',
+                    branch: 'main'
             }
         }
 
@@ -29,8 +29,10 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
-                // Docker login באמצעות קרדנשיאלס המעודכן
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-hub-nofarpanker', 
+                    passwordVariable: 'DOCKER_PASS', 
+                    usernameVariable: 'DOCKER_USER')]) {
                     sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                     sh 'docker push $DOCKER_IMAGE_NAME:latest'
                 }
