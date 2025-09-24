@@ -1,27 +1,30 @@
 pipeline {
-    agent { label 'jenkins-agent' }   // שם הלייבל של האג’נט המרוחק
+    agent { label 'jenkins-agent' }
 
     environment {
-        REGISTRY      = "nofarpanker"        // שם המשתמש ב-Docker Hub
-        FRONT_IMG     = "luxe-frontend"
-        BACK_IMG      = "luxe-backend"
-        AUTH_IMG      = "luxe-auth"
+        // שם המשתמש בדוקר־האב
+        DOCKER_HUB_USER = 'nofarpanker'
+
+        // שמות האימג'ים
+        FRONT_IMG = "luxe-frontend"
+        BACK_IMG  = "luxe-backend"
+        AUTH_IMG  = "luxe-auth"
     }
 
     stages {
-
         stage('Checkout') {
             steps {
+                // ***** שימוש ב-HTTPS ובקרדשנלס *****
                 git branch: 'main',
-                    credentialsId: 'github-credentials-id',
-                    url: 'git@github.com:YOUR_ORG/Luxe-jewelery-store.git'
+                    url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git',
+                    credentialsId: 'github-credentials-id'
             }
         }
 
         stage('Build Auth Service') {
             steps {
                 dir('auth-service') {
-                    sh 'docker build -t $REGISTRY/$AUTH_IMG:latest -f ../infra/Dockerfile.auth .'
+                    sh "docker build -t ${DOCKER_HUB_USER}/${AUTH_IMG}:latest -f ../infra/Dockerfile.auth ."
                 }
             }
         }
@@ -29,7 +32,7 @@ pipeline {
         stage('Build Backend') {
             steps {
                 dir('backend') {
-                    sh 'docker build -t $REGISTRY/$BACK_IMG:latest -f ../infra/Dockerfile.backend .'
+                    sh "docker build -t ${DOCKER_HUB_USER}/${BACK_IMG}:latest -f ../infra/Dockerfile.backend ."
                 }
             }
         }
@@ -37,7 +40,7 @@ pipeline {
         stage('Build Frontend') {
             steps {
                 dir('jewelry-store') {
-                    sh 'docker build -t $REGISTRY/$FRONT_IMG:latest -f ../infra/Dockerfile.fronted .'
+                    sh "docker build -t ${DOCKER_HUB_USER}/${FRONT_IMG}:latest -f ../infra/Dockerfile.frontend ."
                 }
             }
         }
@@ -45,22 +48,19 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'github-credentials-id',   // משמש גם לגישה ל-Docker Hub אם מוגדר שם/סיסמה
+                    credentialsId: 'docker-hub-credentials-id',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
-                    sh 'docker push $REGISTRY/$AUTH_IMG:latest'
-                    sh 'docker push $REGISTRY/$BACK_IMG:latest'
-                    sh 'docker push $REGISTRY/$FRONT_IMG:latest'
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push ${DOCKER_HUB_USER}/${AUTH_IMG}:latest
+                        docker push ${DOCKER_HUB_USER}/${BACK_IMG}:latest
+                        docker push ${DOCKER_HUB_USER}/${FRONT_IMG}:latest
+                        docker logout
+                    '''
                 }
             }
-        }
-    }
-
-    post {
-        always {
-            sh 'docker logout || true'
         }
     }
 }
