@@ -1,11 +1,16 @@
+# Dockerfile.auth
 FROM node:18
+
 WORKDIR /app
 
-# העתקת הקבצים של ה-auth-service בלבד
-COPY package*.json ./
+# העתקת קבצי package.json ראשיים להתקנת תלותות
+COPY auth-service/package*.json ./
+
 RUN npm install
 
-COPY . .
+# העתקת כל קוד השירות
+COPY auth-service/. ./
+
 CMD ["npm", "start"]
 
 

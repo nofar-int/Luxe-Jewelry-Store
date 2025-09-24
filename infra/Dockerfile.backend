@@ -1,9 +1,12 @@
-FROM node:18
+# Dockerfile.backend
+FROM openjdk:17
+
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
+COPY backend/pom.xml ./
+RUN ./mvnw dependency:resolve
 
-COPY . .
-CMD ["npm", "start"]
+COPY backend/. ./
+
+CMD ["./mvnw", "spring-boot:run"]
 

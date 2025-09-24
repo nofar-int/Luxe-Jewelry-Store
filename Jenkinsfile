@@ -9,47 +9,46 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git', branch: 'main', credentialsId: "${GIT_CREDS}"
+                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git',
+                    branch: 'main',
+                    credentialsId: "${GIT_CREDS}"
             }
         }
 
         stage('Build Auth Service') {
             steps {
-                dir('auth-service') {
-                    sh 'docker build -t $AUTH_IMG -f ../infra/Dockerfile.auth .'
-                }
+                sh 'docker build -t $AUTH_IMG -f infra/Dockerfile.auth .'
             }
         }
 
         stage('Build Backend') {
             steps {
-                dir('backend') {
-                    sh 'docker build -t $BACK_IMG -f ../infra/Dockerfile.backend .'
-                }
+                sh 'docker build -t $BACK_IMG -f infra/Dockerfile.backend .'
             }
         }
 
         stage('Build Frontend') {
             steps {
-                dir('jewelry-store') {
-                    sh 'docker build -t $FRONT_IMG -f ../infra/Dockerfile.frontend .'
-                }
+                sh 'docker build -t $FRONT_IMG -f infra/Dockerfile.frontend .'
             }
         }
 
         stage('Push to Docker Hub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials-id', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                withDockerRegistry([credentialsId: 'docker-hub-credentials', url: '']) {
                     sh 'docker push $AUTH_IMG'
                     sh 'docker push $BACK_IMG'
                     sh 'docker push $FRONT_IMG'
-                    sh 'docker logout'
                 }
             }
+        }
+    }
+
+    post {
+        always {
+            sh 'docker logout'
         }
     }
 }
