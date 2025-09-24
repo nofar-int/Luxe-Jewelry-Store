@@ -1,38 +1,33 @@
 pipeline {
-    agent any
-
+    agent { label 'docker-agent' }
     environment {
-        DOCKER_HUB_CREDENTIALS = credentials('docker-hub-nofarpanker') // קרדנציאל דוקר בלבד
-        DOCKER_IMAGE_NAME = "nofarpanker/luxe-jewelry-store-agent"  // שם האימג' בדוקר
+        DOCKER_HUB_CREDENTIALS = credentials('docker-hub-nofarpanker')
     }
-
     stages {
-        stage('Checkout') {
-            steps {
-                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git', branch: 'main'
-            }
-        }
-
         stage('Build Frontend') {
             steps {
-                sh 'docker build -t luxe-jewelry-store-front:latest -f Dockerfile .'
+                dir('jewelry-store') {
+                    sh 'docker build -t luxe-jewelry-store-front .'
+                }
             }
         }
-
-        stage('Build Agent Image') {
+        stage('Build Backend') {
             steps {
-                sh 'docker build -t $DOCKER_IMAGE_NAME:latest -f Dockerfile.agent .'
+                dir('backend') {
+                    sh 'docker build -t luxe-jewelry-store-backend .'
+                }
             }
         }
-
-        stage('Push Docker Image') {
+        stage('Push Docker Images') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-                    sh 'docker push $DOCKER_IMAGE_NAME:latest'
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                    sh 'echo $PASSWORD | docker login -u $USERNAME --password-stdin'
+                    sh 'docker push luxe-jewelry-store-front'
+                    sh 'docker push luxe-jewelry-store-backend'
                 }
             }
         }
     }
 }
+
 
