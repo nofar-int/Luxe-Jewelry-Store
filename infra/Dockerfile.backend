@@ -1,13 +1,19 @@
-# infra/Dockerfile.backend
+# Dockerfile.backend
 FROM node:18
+
+# הגדרת תיקיית עבודה
 WORKDIR /app
 
-COPY jewelry-store/package*.json ./
-COPY jewelry-store/src/ ./src/
+# העתק package.json ו־package-lock.json מהתיקייה הראשית
+COPY ../package*.json ./
 
+# התקנת תלויות
 RUN npm install
 
-EXPOSE 3002
-CMD ["node", "src/index.js"]
+# העתקת קבצי השירות עצמו
+COPY ./backend-service ./ 
+
+# הגדרת הפקודה להפעלת השירות
+CMD ["npm", "start"]
 
 

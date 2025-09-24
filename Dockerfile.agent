@@ -1,14 +1,6 @@
-# Dockerfile.agent (בשורש)
-FROM node:18
-WORKDIR /app
+FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y docker.io git curl
+CMD ["tail", "-f", "/dev/null"]
 
-# העתק package.json והקוד מהתיקייה jewelry-store
-COPY jewelry-store/package*.json ./
-COPY jewelry-store/src/ ./src/
-
-RUN npm install
-
-EXPOSE 3004
-CMD ["node", "src/index.js"]
 
 

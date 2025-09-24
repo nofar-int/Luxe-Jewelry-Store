@@ -1,28 +1,37 @@
 pipeline {
     agent any
-
+    environment {
+        PATH = "/usr/bin:$PATH" // Docker נמצא כאן
+    }
     stages {
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git', branch: 'main'
+                checkout([$class: 'GitSCM', branches: [[name: 'main']],
+                  userRemoteConfigs: [[url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git']]])
             }
         }
 
         stage('Build Auth Service') {
             steps {
-                sh 'docker build -t nofarpanker/luxe-auth:latest -f Dockerfile.auth .'
+                dir('auth-service') {
+                    sh 'docker build -t nofarpanker/luxe-auth:latest -f ../Dockerfile.auth .'
+                }
             }
         }
 
         stage('Build Backend Service') {
             steps {
-                sh 'docker build -t nofarpanker/luxe-backend:latest -f Dockerfile.backend .'
+                dir('backend-service') {
+                    sh 'docker build -t nofarpanker/luxe-backend:latest -f ../Dockerfile.backend .'
+                }
             }
         }
 
         stage('Build Frontend Service') {
             steps {
-                sh 'docker build -t nofarpanker/luxe-frontend:latest -f Dockerfile.frontend .'
+                dir('frontend') {
+                    sh 'docker build -t nofarpanker/luxe-frontend:latest -f ../Dockerfile.frontend .'
+                }
             }
         }
 
@@ -34,14 +43,17 @@ pipeline {
 
         stage('Push to Docker Hub') {
             steps {
-                sh 'docker login -u nofarpanker' // ציבורי, אין סיסמה
-                sh 'docker push nofarpanker/luxe-auth:latest'
-                sh 'docker push nofarpanker/luxe-backend:latest'
-                sh 'docker push nofarpanker/luxe-frontend:latest'
-                sh 'docker push nofarpanker/luxe-agent:latest'
-                sh 'docker logout'
+                sh '''
+                    docker login -u <your_dockerhub_username>
+                    docker push nofarpanker/luxe-auth:latest
+                    docker push nofarpanker/luxe-backend:latest
+                    docker push nofarpanker/luxe-frontend:latest
+                    docker push nofarpanker/luxe-agent:latest
+                    docker logout
+                '''
             }
         }
     }
 }
+
 

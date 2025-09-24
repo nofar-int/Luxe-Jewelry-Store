@@ -1,15 +1,12 @@
 # infra/Dockerfile.auth
 FROM node:18
 WORKDIR /app
-
-# העתק קבצי package.json וקוד
-COPY jewelry-store/package*.json ./
-COPY jewelry-store/src/ ./src/
-
+# העתק package.json ו־package-lock.json מהתיקייה הראשית של הפרויקט
+COPY ../package*.json ./
 RUN npm install
+COPY ./ ./
+CMD ["npm", "start"]
 
-EXPOSE 3001
-CMD ["node", "src/index.js"]
 
 
 
