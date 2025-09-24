@@ -1,17 +1,12 @@
 FROM node:18
 WORKDIR /app
 
-# העתקת package.json והתקנת dependencies
-COPY auth/package*.json ./
+# העתקת הקבצים של ה-auth-service בלבד
+COPY package*.json ./
 RUN npm install
 
-# העתקת הקוד
-COPY auth/. .
-
-# חשיפת פורט 4000 (או מה שהאפליקציה שלך משתמשת)
-EXPOSE 4000
-
-# הפעלת ה-service
+COPY . .
 CMD ["npm", "start"]
+
 
 

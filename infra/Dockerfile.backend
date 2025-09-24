@@ -1,16 +1,9 @@
 FROM node:18
 WORKDIR /app
 
-# העתקת package.json והתקנת dependencies
-COPY backend/package*.json ./
+COPY package*.json ./
 RUN npm install
 
-# העתקת הקוד
-COPY backend/. .
-
-# חשיפת פורט 5000 (או מה שהאפליקציה שלך משתמשת)
-EXPOSE 5000
-
-# הפעלת ה-backend
+COPY . .
 CMD ["npm", "start"]
 

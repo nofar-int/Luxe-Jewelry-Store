@@ -2,29 +2,24 @@ pipeline {
     agent { label 'jenkins-agent' }
 
     environment {
-        // שם המשתמש בדוקר־האב
-        DOCKER_HUB_USER = 'nofarpanker'
-
-        // שמות האימג'ים
-        FRONT_IMG = "luxe-frontend"
-        BACK_IMG  = "luxe-backend"
-        AUTH_IMG  = "luxe-auth"
+        FRONT_IMG = "nofarpanker/luxe-frontend"
+        BACK_IMG  = "nofarpanker/luxe-backend"
+        AUTH_IMG  = "nofarpanker/luxe-auth"
+        GIT_CREDS = "github-credentials-id"
     }
 
     stages {
+
         stage('Checkout') {
             steps {
-                // ***** שימוש ב-HTTPS ובקרדשנלס *****
-                git branch: 'main',
-                    url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git',
-                    credentialsId: 'github-credentials-id'
+                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git', branch: 'main', credentialsId: "${GIT_CREDS}"
             }
         }
 
         stage('Build Auth Service') {
             steps {
                 dir('auth-service') {
-                    sh "docker build -t ${DOCKER_HUB_USER}/${AUTH_IMG}:latest -f ../infra/Dockerfile.auth ."
+                    sh 'docker build -t $AUTH_IMG -f ../infra/Dockerfile.auth .'
                 }
             }
         }
@@ -32,7 +27,7 @@ pipeline {
         stage('Build Backend') {
             steps {
                 dir('backend') {
-                    sh "docker build -t ${DOCKER_HUB_USER}/${BACK_IMG}:latest -f ../infra/Dockerfile.backend ."
+                    sh 'docker build -t $BACK_IMG -f ../infra/Dockerfile.backend .'
                 }
             }
         }
@@ -40,27 +35,22 @@ pipeline {
         stage('Build Frontend') {
             steps {
                 dir('jewelry-store') {
-                    sh "docker build -t ${DOCKER_HUB_USER}/${FRONT_IMG}:latest -f ../infra/Dockerfile.frontend ."
+                    sh 'docker build -t $FRONT_IMG -f ../infra/Dockerfile.frontend .'
                 }
             }
         }
 
         stage('Push to Docker Hub') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'docker-hub-credentials-id',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push ${DOCKER_HUB_USER}/${AUTH_IMG}:latest
-                        docker push ${DOCKER_HUB_USER}/${BACK_IMG}:latest
-                        docker push ${DOCKER_HUB_USER}/${FRONT_IMG}:latest
-                        docker logout
-                    '''
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials-id', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh 'docker push $AUTH_IMG'
+                    sh 'docker push $BACK_IMG'
+                    sh 'docker push $FRONT_IMG'
+                    sh 'docker logout'
                 }
             }
         }
     }
 }
+

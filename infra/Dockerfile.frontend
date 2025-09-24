@@ -1,34 +1,9 @@
-# ===========================
-# Build Stage
-# ===========================
-FROM node:18 AS build
+FROM node:18
 WORKDIR /app
 
-# העתקת package.json ו-package-lock.json
-COPY jewelry-store/package*.json ./
-
-# התקנת dependencies
+COPY package*.json ./
 RUN npm install
 
-# העתקת שאר הקוד
-COPY jewelry-store/. .
-
-# בניית האפליקציה ל־production
-RUN npm run build
-
-# ===========================
-# Runtime Stage - Nginx
-# ===========================
-FROM nginx:alpine
-
-# העתקת תיקיית build ל־Nginx
-COPY --from=build /app/build /usr/share/nginx/html
-
-# חשיפת פורט 80
-EXPOSE 80
-
-# הפעלת Nginx
-CMD ["nginx", "-g", "daemon off;"]
-
-
+COPY . .
+CMD ["npm", "start"]
 
