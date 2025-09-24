@@ -2,54 +2,66 @@ pipeline {
     agent { label 'jenkins-agent' }
 
     environment {
-        FRONT_IMG = "nofarpanker/luxe-frontend"
-        BACK_IMG  = "nofarpanker/luxe-backend"
-        AUTH_IMG  = "nofarpanker/luxe-auth"
-        GIT_CREDS = "github-credentials-id"
+        DOCKERHUB_USER = "nofarpanker"
+        GIT_CREDS     = credentials('github-credentials-id')
+        FRONT_IMG     = "luxe-frontend"
+        BACK_IMG      = "luxe-backend"
+        AUTH_IMG      = "luxe-auth"
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout SCM') {
             steps {
-                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git',
-                    branch: 'main',
-                    credentialsId: "${GIT_CREDS}"
+                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git', credentialsId: "${GIT_CREDS}"
             }
         }
 
         stage('Build Auth Service') {
             steps {
-                sh 'docker build -t $AUTH_IMG -f infra/Dockerfile.auth .'
+                dir('auth-service') {
+                    sh "docker build -t ${DOCKERHUB_USER}/${AUTH_IMG} -f ../infra/Dockerfile.auth ."
+                }
             }
         }
 
         stage('Build Backend') {
             steps {
-                sh 'docker build -t $BACK_IMG -f infra/Dockerfile.backend .'
+                dir('backend') {
+                    sh "docker build -t ${DOCKERHUB_USER}/${BACK_IMG} -f ../infra/Dockerfile.backend ."
+                }
             }
         }
 
         stage('Build Frontend') {
             steps {
-                sh 'docker build -t $FRONT_IMG -f infra/Dockerfile.frontend .'
+                dir('jewelry-store') {
+                    sh "docker build -t ${DOCKERHUB_USER}/${FRONT_IMG} -f ../infra/Dockerfile.frontend ."
+                }
             }
         }
 
         stage('Push to Docker Hub') {
             steps {
-                withDockerRegistry([credentialsId: 'docker-hub-credentials', url: '']) {
-                    sh 'docker push $AUTH_IMG'
-                    sh 'docker push $BACK_IMG'
-                    sh 'docker push $FRONT_IMG'
-                }
+                sh "docker login -u ${DOCKERHUB_USER} -p ${DOCKER_HUB_PASS}"
+                sh "docker push ${DOCKERHUB_USER}/${AUTH_IMG}"
+                sh "docker push ${DOCKERHUB_USER}/${BACK_IMG}"
+                sh "docker push ${DOCKERHUB_USER}/${FRONT_IMG}"
+                sh "docker logout"
             }
         }
     }
 
     post {
         always {
-            sh 'docker logout'
+            echo "Pipeline finished"
+        }
+        success {
+            echo "All services built and pushed successfully!"
+        }
+        failure {
+            echo "Pipeline failed. Check logs."
         }
     }
 }
+
 

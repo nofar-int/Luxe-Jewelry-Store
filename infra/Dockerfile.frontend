@@ -3,11 +3,10 @@ FROM node:18
 
 WORKDIR /app
 
-COPY jewelry-store/package*.json ./
+COPY package*.json ./
 RUN npm install
 
-COPY jewelry-store/. ./
-
+COPY . .
+EXPOSE 3000
 CMD ["npm", "start"]
-
 

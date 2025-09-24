@@ -3,15 +3,14 @@ FROM node:18
 
 WORKDIR /app
 
-# העתקת קבצי package.json ראשיים להתקנת תלותות
-COPY auth-service/package*.json ./
-
+# הקבצים מועתקים מתוך תיקיית השירות שה־context שלה מוגדר כ־auth-service
+COPY package*.json ./
 RUN npm install
 
-# העתקת כל קוד השירות
-COPY auth-service/. ./
-
+COPY . .
+EXPOSE 3001
 CMD ["npm", "start"]
+
 
 
 
