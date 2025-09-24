@@ -1,6 +1,21 @@
 # Dockerfile.agent
-FROM jenkins/inbound-agent:latest
-USER root
-RUN apt-get update && apt-get install -y docker.io
+FROM ubuntu:22.04
+
+# התקנת Java 17
+RUN apt-get update && \
+    apt-get install -y openjdk-17-jdk curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# יצירת משתמש Jenkins
+RUN useradd -m -d /home/jenkins -s /bin/bash jenkins
+
 USER jenkins
+WORKDIR /home/jenkins
+
+# העתקת agent.jar - במידה ויש צורך בהעתקה מראש
+COPY agent.jar /home/jenkins/agent.jar
+
+# ברירת מחדל – workdir
+CMD ["bash"]
+
 
