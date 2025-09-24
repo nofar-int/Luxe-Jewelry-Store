@@ -1,15 +1,15 @@
-# Dockerfile.auth
+# infra/Dockerfile.auth
 FROM node:18
-
 WORKDIR /app
 
-# הקבצים מועתקים מתוך תיקיית השירות שה־context שלה מוגדר כ־auth-service
-COPY package*.json ./
+# העתק קבצי package.json וקוד
+COPY jewelry-store/package*.json ./
+COPY jewelry-store/src/ ./src/
+
 RUN npm install
 
-COPY . .
 EXPOSE 3001
-CMD ["npm", "start"]
+CMD ["node", "src/index.js"]
 
 
 

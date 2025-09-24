@@ -1,12 +1,12 @@
-# Dockerfile.frontend
+# infra/Dockerfile.frontend
 FROM node:18
-
 WORKDIR /app
 
-COPY package*.json ./
+COPY jewelry-store/package*.json ./
+COPY jewelry-store/src/ ./src/
+
 RUN npm install
 
-COPY . .
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["node", "src/index.js"]
 

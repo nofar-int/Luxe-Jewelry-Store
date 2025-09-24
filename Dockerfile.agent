@@ -1,21 +1,14 @@
-# Dockerfile.agent
-FROM ubuntu:22.04
+# Dockerfile.agent (בשורש)
+FROM node:18
+WORKDIR /app
 
-# התקנת Java 17
-RUN apt-get update && \
-    apt-get install -y openjdk-17-jdk curl && \
-    rm -rf /var/lib/apt/lists/*
+# העתק package.json והקוד מהתיקייה jewelry-store
+COPY jewelry-store/package*.json ./
+COPY jewelry-store/src/ ./src/
 
-# יצירת משתמש Jenkins
-RUN useradd -m -d /home/jenkins -s /bin/bash jenkins
+RUN npm install
 
-USER jenkins
-WORKDIR /home/jenkins
-
-# העתקת agent.jar - במידה ויש צורך בהעתקה מראש
-COPY agent.jar /home/jenkins/agent.jar
-
-# ברירת מחדל – workdir
-CMD ["bash"]
+EXPOSE 3004
+CMD ["node", "src/index.js"]
 
 

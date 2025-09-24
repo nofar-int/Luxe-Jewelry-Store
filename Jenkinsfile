@@ -1,70 +1,47 @@
 pipeline {
-    agent { label 'jenkins-agent' }
-
-    environment {
-        DOCKER_USER = "nofarpanker"
-        FRONT_IMG  = "luxe-frontend"
-        BACK_IMG   = "luxe-backend"
-        AUTH_IMG   = "luxe-auth"
-    }
+    agent any
 
     stages {
-
-        stage('Checkout SCM') {
+        stage('Checkout') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git'
+                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git', branch: 'main'
             }
         }
 
         stage('Build Auth Service') {
             steps {
-                dir('auth-service') {
-                    sh """
-                        docker build -t ${DOCKER_USER}/${AUTH_IMG}:latest -f ../infra/Dockerfile.auth .
-                    """
-                }
+                sh 'docker build -t nofarpanker/luxe-auth:latest -f Dockerfile.auth .'
             }
         }
 
-        stage('Build Backend') {
+        stage('Build Backend Service') {
             steps {
-                dir('backend') {
-                    sh """
-                        docker build -t ${DOCKER_USER}/${BACK_IMG}:latest -f ../infra/Dockerfile.backend .
-                    """
-                }
+                sh 'docker build -t nofarpanker/luxe-backend:latest -f Dockerfile.backend .'
             }
         }
 
-        stage('Build Frontend') {
+        stage('Build Frontend Service') {
             steps {
-                dir('jewelry-store') {
-                    sh """
-                        docker build -t ${DOCKER_USER}/${FRONT_IMG}:latest -f ../infra/Dockerfile.frontend .
-                    """
-                }
+                sh 'docker build -t nofarpanker/luxe-frontend:latest -f Dockerfile.frontend .'
+            }
+        }
+
+        stage('Build Agent Service') {
+            steps {
+                sh 'docker build -t nofarpanker/luxe-agent:latest -f Dockerfile.agent .'
             }
         }
 
         stage('Push to Docker Hub') {
             steps {
-                sh "docker login -u ${DOCKER_USER} && docker push ${DOCKER_USER}/${AUTH_IMG}:latest"
-                sh "docker push ${DOCKER_USER}/${BACK_IMG}:latest"
-                sh "docker push ${DOCKER_USER}/${FRONT_IMG}:latest"
-                sh "docker logout"
+                sh 'docker login -u nofarpanker' // ציבורי, אין סיסמה
+                sh 'docker push nofarpanker/luxe-auth:latest'
+                sh 'docker push nofarpanker/luxe-backend:latest'
+                sh 'docker push nofarpanker/luxe-frontend:latest'
+                sh 'docker push nofarpanker/luxe-agent:latest'
+                sh 'docker logout'
             }
         }
     }
-
-    post {
-        always {
-            echo "Pipeline finished"
-        }
-        failure {
-            echo "Pipeline failed. Check logs."
-        }
-    }
 }
-
 
