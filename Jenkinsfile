@@ -2,7 +2,7 @@ pipeline {
     agent { label 'jenkins-agent' }
 
     environment {
-        # קרדשנלס Docker Hub – דרושים רק לדחיפה, לא ל-Git
+      
         DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
     }
 
