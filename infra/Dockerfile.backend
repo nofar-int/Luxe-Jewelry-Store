@@ -1,19 +1,10 @@
-# Dockerfile.backend
-FROM node:18
-
-# הגדרת תיקיית עבודה
+FROM python:3.11-slim
 WORKDIR /app
+COPY ./backend/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+COPY ./backend /app
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
-# העתק package.json ו־package-lock.json מהתיקייה הראשית
-COPY ../package*.json ./
-
-# התקנת תלויות
-RUN npm install
-
-# העתקת קבצי השירות עצמו
-COPY ./backend-service ./ 
-
-# הגדרת הפקודה להפעלת השירות
-CMD ["npm", "start"]
 
 

@@ -1,16 +1,14 @@
 pipeline {
-    agent any
+    agent { label 'jenkins-agent' }
     environment {
-        PATH = "/usr/bin:$PATH" // Docker נמצא כאן
+        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
     }
     stages {
         stage('Checkout') {
             steps {
-                checkout([$class: 'GitSCM', branches: [[name: 'main']],
-                  userRemoteConfigs: [[url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git']]])
+                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git'
             }
         }
-
         stage('Build Auth Service') {
             steps {
                 dir('auth-service') {
@@ -18,7 +16,6 @@ pipeline {
                 }
             }
         }
-
         stage('Build Backend Service') {
             steps {
                 dir('backend-service') {
@@ -26,7 +23,6 @@ pipeline {
                 }
             }
         }
-
         stage('Build Frontend Service') {
             steps {
                 dir('frontend') {
@@ -34,23 +30,12 @@ pipeline {
                 }
             }
         }
-
-        stage('Build Agent Service') {
-            steps {
-                sh 'docker build -t nofarpanker/luxe-agent:latest -f Dockerfile.agent .'
-            }
-        }
-
         stage('Push to Docker Hub') {
             steps {
-                sh '''
-                    docker login -u <your_dockerhub_username>
-                    docker push nofarpanker/luxe-auth:latest
-                    docker push nofarpanker/luxe-backend:latest
-                    docker push nofarpanker/luxe-frontend:latest
-                    docker push nofarpanker/luxe-agent:latest
-                    docker logout
-                '''
+                sh "echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED_USR --password-stdin"
+                sh 'docker push nofarpanker/luxe-auth:latest'
+                sh 'docker push nofarpanker/luxe-backend:latest'
+                sh 'docker push nofarpanker/luxe-frontend:latest'
             }
         }
     }
