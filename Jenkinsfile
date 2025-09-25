@@ -2,7 +2,6 @@ pipeline {
     agent { label 'jenkins-agent' }
 
     environment {
-      
         DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
     }
 
@@ -21,7 +20,8 @@ pipeline {
         stage('Build Auth Service') {
             steps {
                 dir('auth-service') {
-                    sh 'docker build -t nofarpanker/luxe-auth:latest -f ../Dockerfile.auth .'
+                    // Dockerfile יושב בשורש/infra
+                    sh 'docker build -t nofarpanker/luxe-auth:latest -f ../infra/Dockerfile.auth .'
                 }
             }
         }
@@ -29,7 +29,8 @@ pipeline {
         stage('Build Backend Service') {
             steps {
                 dir('backend-service') {
-                    sh 'docker build -t nofarpanker/luxe-backend:latest -f ../Dockerfile.backend .'
+                    // Dockerfile יושב בשורש/infra
+                    sh 'docker build -t nofarpanker/luxe-backend:latest -f ../infra/Dockerfile.backend .'
                 }
             }
         }
@@ -37,7 +38,8 @@ pipeline {
         stage('Build Frontend Service') {
             steps {
                 dir('frontend') {
-                    sh 'docker build -t nofarpanker/luxe-frontend:latest -f ../Dockerfile.frontend .'
+                    // Dockerfile יושב בשורש/infra
+                    sh 'docker build -t nofarpanker/luxe-frontend:latest -f ../infra/Dockerfile.frontend .'
                 }
             }
         }
@@ -53,3 +55,4 @@ pipeline {
         }
     }
 }
+
