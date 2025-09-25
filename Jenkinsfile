@@ -6,7 +6,8 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git'
+                // וודא שהוא בודק את ה-branch main
+                git branch: 'main', url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git'
             }
         }
         stage('Build Auth Service') {
