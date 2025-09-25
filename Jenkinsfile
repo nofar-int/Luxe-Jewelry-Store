@@ -1,15 +1,23 @@
 pipeline {
     agent { label 'jenkins-agent' }
+
     environment {
+        # קרדשנלס Docker Hub – דרושים רק לדחיפה, לא ל-Git
         DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
     }
+
     stages {
+
         stage('Checkout') {
             steps {
-                // וודא שהוא בודק את ה-branch main
-                git branch: 'main', url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git'
+                // חיבור ישיר לריפו הציבורי, בראנץ' main
+                git(
+                    url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git',
+                    branch: 'main'
+                )
             }
         }
+
         stage('Build Auth Service') {
             steps {
                 dir('auth-service') {
@@ -17,6 +25,7 @@ pipeline {
                 }
             }
         }
+
         stage('Build Backend Service') {
             steps {
                 dir('backend-service') {
@@ -24,6 +33,7 @@ pipeline {
                 }
             }
         }
+
         stage('Build Frontend Service') {
             steps {
                 dir('frontend') {
@@ -31,8 +41,10 @@ pipeline {
                 }
             }
         }
+
         stage('Push to Docker Hub') {
             steps {
+                // התחברות ל-Docker Hub ודחיפת האימג'ים
                 sh "echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED_USR --password-stdin"
                 sh 'docker push nofarpanker/luxe-auth:latest'
                 sh 'docker push nofarpanker/luxe-backend:latest'
@@ -41,5 +53,3 @@ pipeline {
         }
     }
 }
-
-
