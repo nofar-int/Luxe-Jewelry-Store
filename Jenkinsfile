@@ -1,11 +1,14 @@
 pipeline {
     agent { label 'jenkins-agent' }
 
+    options {
+        ansiColor('xterm')
+        timestamps()
+    }
+
     environment {
-        // קרדנשלס לדוקר־האב
-        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
-        // קרדנשלס של Snyk (ID = SNYK_TOKEN)
-        SNYK_TOKEN      = credentials('SNYK_TOKEN')
+        // קרדנשלס של Snyk (ID = SNYK_TOKEN) – נגיש כ-$SNYK_TOKEN
+        SNYK_TOKEN = credentials('SNYK_TOKEN')
     }
 
     stages {
@@ -19,47 +22,40 @@ pipeline {
             }
         }
 
-        stage('Build Auth Service') {
+        stage('Build Images') {
             steps {
-                dir('.') {
-                    sh 'docker build -t nofarpanker/luxe-auth:latest -f infra/Dockerfile.auth auth-service'
-                }
-            }
-        }
-
-        stage('Build Backend Service') {
-            steps {
-                dir('.') {
-                    sh 'docker build -t nofarpanker/luxe-backend:latest -f infra/Dockerfile.backend backend'
-                }
-            }
-        }
-
-        stage('Build Frontend Service') {
-            steps {
-                dir('.') {
-                    sh 'docker build -t nofarpanker/luxe-frontend:latest -f infra/Dockerfile.frontend jewelry-store'
-                }
+                sh '''
+                  DOCKER_BUILDKIT=0 docker build -t nofarpanker/luxe-auth:latest    -f infra/Dockerfile.auth     auth-service
+                  DOCKER_BUILDKIT=0 docker build -t nofarpanker/luxe-backend:latest -f infra/Dockerfile.backend  backend
+                  DOCKER_BUILDKIT=0 docker build -t nofarpanker/luxe-frontend:latest -f infra/Dockerfile.frontend jewelry-store
+                '''
             }
         }
 
         stage('Push to Docker Hub') {
             steps {
-                sh "echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED_USR --password-stdin"
-                sh 'docker push nofarpanker/luxe-auth:latest'
-                sh 'docker push nofarpanker/luxe-backend:latest'
-                sh 'docker push nofarpanker/luxe-frontend:latest'
+                // שימוש בקרדנשלס מאוחסנים (ID = docker-hub-nofarpanker)
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker',
+                                                 usernameVariable: 'DOCKER_USER',
+                                                 passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                      echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                      docker push nofarpanker/luxe-auth:latest
+                      docker push nofarpanker/luxe-backend:latest
+                      docker push nofarpanker/luxe-frontend:latest
+                    '''
+                }
             }
         }
 
         stage('Snyk Monitor') {
             steps {
-                // סריקה ושליחה לדשבורד
-                sh 'snyk container monitor nofarpanker/luxe-auth:latest --file=infra/Dockerfile.auth'
-                sh 'snyk container monitor nofarpanker/luxe-backend:latest --file=infra/Dockerfile.backend'
-                sh 'snyk container monitor nofarpanker/luxe-frontend:latest --file=infra/Dockerfile.frontend'
+                sh '''
+                  snyk container monitor nofarpanker/luxe-auth:latest    --file=infra/Dockerfile.auth
+                  snyk container monitor nofarpanker/luxe-backend:latest --file=infra/Dockerfile.backend
+                  snyk container monitor nofarpanker/luxe-frontend:latest --file=infra/Dockerfile.frontend
+                '''
             }
         }
     }
 }
-
