@@ -2,7 +2,10 @@ pipeline {
     agent { label 'jenkins-agent' }
 
     environment {
+        // קרדנשלס לדוקר־האב
         DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
+        // קרדנשלס של Snyk (ID = SNYK_TOKEN)
+        SNYK_TOKEN      = credentials('SNYK_TOKEN')
     }
 
     stages {
@@ -46,6 +49,15 @@ pipeline {
                 sh 'docker push nofarpanker/luxe-auth:latest'
                 sh 'docker push nofarpanker/luxe-backend:latest'
                 sh 'docker push nofarpanker/luxe-frontend:latest'
+            }
+        }
+
+        stage('Snyk Monitor') {
+            steps {
+                // סריקה ושליחה לדשבורד
+                sh 'snyk container monitor nofarpanker/luxe-auth:latest --file=infra/Dockerfile.auth'
+                sh 'snyk container monitor nofarpanker/luxe-backend:latest --file=infra/Dockerfile.backend'
+                sh 'snyk container monitor nofarpanker/luxe-frontend:latest --file=infra/Dockerfile.frontend'
             }
         }
     }

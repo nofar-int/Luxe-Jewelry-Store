@@ -2,12 +2,25 @@ FROM jenkins/agent:latest
 
 USER root
 
-# התקנת docker-cli ו-git פעם אחת
+# התקנת Docker CLI, git, Python3, pip, unzip, curl
 RUN apt-get update && \
-    apt-get install -y docker.io git && \
+    apt-get install -y docker.io git python3 python3-pip unzip curl && \
     rm -rf /var/lib/apt/lists/*
 
-# נרד חזרה למשתמש jenkins
+# התקנת AWS CLI v2
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws/install --bin-dir /usr/local/bin && \
+    rm -rf aws awscliv2.zip
+
+# התקנת Snyk CLI
+RUN mkdir -p /usr/local/snyk && cd /usr/local/snyk && \
+    curl -s https://static.snyk.io/cli/v1.666.0/snyk-linux -o snyk && \
+    chmod +x snyk && \
+    ln -s /usr/local/snyk/snyk /usr/local/bin/snyk
+
+# החזרה למשתמש Jenkins
 USER jenkins
 
 WORKDIR /home/jenkins
+
