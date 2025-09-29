@@ -2,12 +2,10 @@ pipeline {
     agent { label 'jenkins-agent' }
 
     options {
-        ansiColor('xterm')
         timestamps()
     }
 
     environment {
-        // קרדנשלס של Snyk (ID = SNYK_TOKEN) – נגיש כ-$SNYK_TOKEN
         SNYK_TOKEN = credentials('SNYK_TOKEN')
     }
 
@@ -34,7 +32,6 @@ pipeline {
 
         stage('Push to Docker Hub') {
             steps {
-                // שימוש בקרדנשלס מאוחסנים (ID = docker-hub-nofarpanker)
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker',
                                                  usernameVariable: 'DOCKER_USER',
                                                  passwordVariable: 'DOCKER_PASS')]) {
