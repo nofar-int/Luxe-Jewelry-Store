@@ -6,6 +6,7 @@ pipeline {
     }
 
     environment {
+        // קרדנשלס של Snyk (ID = SNYK_TOKEN) – נגיש כ-$SNYK_TOKEN
         SNYK_TOKEN = credentials('SNYK_TOKEN')
     }
 
@@ -56,3 +57,6 @@ pipeline {
         }
     }
 }
+
+                     
+                
