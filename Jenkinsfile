@@ -2,10 +2,10 @@ pipeline {
     agent { label 'jenkins-agent' }
 
     environment {
-        #קרדנשלס לדוקר־האב (ה־ID שהוגדר ב־Jenkins)
+      
         DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
-       #קרדנשלס של Snyk (ID = SNYK_TOKEN)
-        SNYK_TOKEN      = credentials('SNYK_TOKEN')
+      
+        SNYK_TOKEN = credentials('SNYK_TOKEN')
     }
 
     stages {
