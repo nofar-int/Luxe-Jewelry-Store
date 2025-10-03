@@ -19,8 +19,14 @@ RUN mkdir -p /usr/local/snyk && cd /usr/local/snyk && \
     chmod +x snyk && \
     ln -s /usr/local/snyk/snyk /usr/local/bin/snyk
 
+# התקנת Node.js 20 + npm עדכני (לפרונטאנד)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g npm@latest
+
 # החזרה למשתמש Jenkins
 USER jenkins
 
 WORKDIR /home/jenkins
+
 
