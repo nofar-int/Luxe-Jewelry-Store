@@ -19,11 +19,11 @@ services:
     depends_on:
       - auth
 
-  front:
+  jewelry-store:
     build:
       context: .
       dockerfile: infra/Dockerfile.frontend
-    container_name: frontend
+    container_name: jewelry-store
     ports:
       - "3000:80"
     depends_on:
