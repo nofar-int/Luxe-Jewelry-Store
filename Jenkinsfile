@@ -2,10 +2,8 @@ pipeline {
     agent { label 'jenkins-agent' }
 
     environment {
-      
         DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
-      
-        SNYK_TOKEN = credentials('SNYK_TOKEN')
+        SNYK_TOKEN      = credentials('SNYK_TOKEN')
     }
 
     stages {
@@ -25,10 +23,7 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git(
-                    url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git',
-                    branch: 'main'
-                )
+                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git', branch: 'main'
             }
         }
 
@@ -36,48 +31,22 @@ pipeline {
             steps {
                 sh '''
                    echo "ניקוי קונטיינרים ותמונות ישנות..."
-                   docker ps -aq | xargs -r docker rm -f || true
+                   docker ps -aq --filter "name=luxe-" | xargs -r -I{} docker rm -f {} || true
                    docker images "nofarpanker/luxe-*" -q | xargs -r docker rmi -f || true
                 '''
             }
         }
 
-        stage('Build Auth Service') {
+        stage('Build & Push Services') {
             steps {
                 sh '''
-                   echo "בונה את auth-service..."
-                   docker build --pull --no-cache \
-                       -t nofarpanker/luxe-auth:latest \
-                       -f infra/Dockerfile.auth auth-service
-                '''
-            }
-        }
+                   echo "בונה ומעלה auth-service..."
+                   docker build --pull --no-cache -t nofarpanker/luxe-auth:latest -f infra/Dockerfile.auth auth-service
+                   echo "בונה ומעלה backend-service..."
+                   docker build --pull --no-cache -t nofarpanker/luxe-backend:latest -f infra/Dockerfile.backend backend
+                   echo "בונה ומעלה frontend-service..."
+                   docker build --pull --no-cache -t nofarpanker/luxe-frontend:latest -f infra/Dockerfile.frontend jewelry-store
 
-        stage('Build Backend Service') {
-            steps {
-                sh '''
-                   echo "בונה את backend..."
-                   docker build --pull --no-cache \
-                       -t nofarpanker/luxe-backend:latest \
-                       -f infra/Dockerfile.backend backend
-                '''
-            }
-        }
-
-        stage('Build Frontend Service') {
-            steps {
-                sh '''
-                   echo "בונה את frontend..."
-                   docker build --pull --no-cache \
-                       -t nofarpanker/luxe-frontend:latest \
-                       -f infra/Dockerfile.frontend jewelry-store
-                '''
-            }
-        }
-
-        stage('Push to Docker Hub') {
-            steps {
-                sh '''
                    echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED_USR --password-stdin
                    docker push nofarpanker/luxe-auth:latest
                    docker push nofarpanker/luxe-backend:latest
@@ -89,7 +58,6 @@ pipeline {
         stage('Snyk Monitor') {
             steps {
                 sh '''
-                   echo "מריץ Snyk Monitor..."
                    snyk container monitor nofarpanker/luxe-auth:latest --file=infra/Dockerfile.auth || true
                    snyk container monitor nofarpanker/luxe-backend:latest --file=infra/Dockerfile.backend || true
                    snyk container monitor nofarpanker/luxe-frontend:latest --file=infra/Dockerfile.frontend || true
@@ -98,3 +66,4 @@ pipeline {
         }
     }
 }
+
