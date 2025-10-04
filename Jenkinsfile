@@ -2,102 +2,106 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_HUB_CRED = credentials('docker-hub-credentials')
-        SNYK_TOKEN = credentials(' SNYK_TOKEN')
-        DOCKER_USER = 'nofarpanker'
+        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
+        SNYK_TOKEN = credentials('SNYK_TOKEN')
+        VENV_DIR = 'venv'
     }
 
     stages {
 
-        stage('Prepare Environment') {
+        stage('Checkout SCM') {
             steps {
-                echo "=== בדיקת התקנות בסיסיות ==="
-                sh '''
-                    docker --version
-                    git --version
-                    python3 --version
-                    pip3 --version
-                    snyk --version
-                '''
+                checkout scm
             }
         }
 
-        stage('Checkout') {
+        stage('Prepare Environment') {
             steps {
-                git branch: 'main', credentialsId: 'github-credentials-id', url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git'
+                sh '''
+                echo "=== בדיקת התקנות בסיסיות ==="
+                docker --version
+                git --version
+                python3 --version
+                pip3 --version
+                snyk --version || echo "Snyk לא מותקן"
+                '''
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                echo "=== מתקין תלויות CI/Testing ==="
                 sh '''
-                    set -e
-                    python3 -m venv venv
-                    . venv/bin/activate
-                    pip install --upgrade pip
-                    pip install -r requirements-ci.txt
+                echo "=== יצירת Virtual Environment והתקנת תלותים ==="
+                python3 -m venv $VENV_DIR
+                source $VENV_DIR/bin/activate
+                pip install --upgrade pip
+                pip install -r environments-ci.txt
                 '''
             }
         }
 
         stage('Lint Code') {
             steps {
-                echo "=== מריץ בדיקות Lint ==="
                 sh '''
-                    . venv/bin/activate
-                    pylint backend auth-service || true
+                source $VENV_DIR/bin/activate
+                flake8 .
                 '''
             }
         }
 
         stage('Run Unit Tests') {
             steps {
-                echo "=== מריץ בדיקות יחידה ==="
                 sh '''
-                    . venv/bin/activate
-                    pytest --junitxml=test-results.xml --maxfail=1 --disable-warnings -q
+                source $VENV_DIR/bin/activate
+                pytest --junitxml=results.xml --html=report.html tests/
                 '''
             }
             post {
                 always {
-                    junit 'test-results.xml'
+                    junit 'results.xml'
+                    publishHTML(target: [
+                        reportName: 'Pytest HTML Report',
+                        reportDir: '.',
+                        reportFiles: 'report.html'
+                    ])
                 }
             }
         }
 
         stage('Clean Old Containers & Images') {
             steps {
-                echo "=== מנקה תמונות ישנות ==="
                 sh '''
-                    docker ps -a -q | xargs -r docker rm -f || true
-                    docker images -q "nofarpanker/luxe-*" | xargs -r docker rmi -f || true
+                docker rm -f $(docker ps -aq) || true
+                docker rmi -f nofarpanker/luxe-auth:latest || true
+                docker rmi -f nofarpanker/luxe-backend:latest || true
+                docker rmi -f nofarpanker/luxe-frontend:latest || true
                 '''
             }
         }
 
         stage('Build & Push Services') {
             steps {
-                echo "=== בונה ומעלה Docker Images ==="
                 sh '''
-                    docker build -t ${DOCKER_USER}/luxe-frontend:latest -f frontend/Dockerfile .
-                    docker build -t ${DOCKER_USER}/luxe-backend:latest -f backend/Dockerfile .
-                    docker build -t ${DOCKER_USER}/luxe-auth:latest -f auth-service/Dockerfile .
-
-                    echo "${DOCKER_HUB_CRED_PSW}" | docker login -u "${DOCKER_USER}" --password-stdin
-                    docker push ${DOCKER_USER}/luxe-frontend:latest
-                    docker push ${DOCKER_USER}/luxe-backend:latest
-                    docker push ${DOCKER_USER}/luxe-auth:latest
+                echo "=== Build & Push Docker Images ==="
+                docker build -t nofarpanker/luxe-auth:latest auth-service/
+                docker build -t nofarpanker/luxe-backend:latest backend/
+                docker build -t nofarpanker/luxe-frontend:latest frontend/
+                
+                echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED --password-stdin
+                docker push nofarpanker/luxe-auth:latest
+                docker push nofarpanker/luxe-backend:latest
+                docker push nofarpanker/luxe-frontend:latest
                 '''
             }
         }
 
         stage('Snyk Security Scan') {
             steps {
-                echo "=== מבצע סריקת אבטחה עם Snyk ==="
                 sh '''
-                    snyk auth ${SNYK_TOKEN}
-                    snyk container test ${DOCKER_USER}/luxe-backend:latest || true
+                source $VENV_DIR/bin/activate
+                snyk container test nofarpanker/luxe-auth:latest --file=auth-service/Dockerfile
+                snyk container test nofarpanker/luxe-backend:latest --file=backend/Dockerfile
+                snyk container test nofarpanker/luxe-frontend:latest --file=frontend/Dockerfile
                 '''
             }
         }
@@ -107,18 +111,21 @@ pipeline {
         always {
             echo "ניקוי משאבים..."
             sh '''
-                docker rmi ${DOCKER_USER}/luxe-auth:latest || true
-                docker rmi ${DOCKER_USER}/luxe-backend:latest || true
-                docker rmi ${DOCKER_USER}/luxe-frontend:latest || true
+            docker rmi -f nofarpanker/luxe-auth:latest || true
+            docker rmi -f nofarpanker/luxe-backend:latest || true
+            docker rmi -f nofarpanker/luxe-frontend:latest || true
             '''
         }
+
+        success {
+            echo "✅ הפייפליין הסתיים בהצלחה"
+        }
+
         failure {
             echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס"
         }
-        success {
-            echo "✅ כל השלבים הושלמו בהצלחה!"
-        }
     }
 }
+
 
 
