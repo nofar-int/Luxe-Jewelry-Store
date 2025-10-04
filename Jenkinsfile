@@ -1,16 +1,13 @@
 pipeline {
     agent { label 'jenkins-agent' }
     environment {
-        DOCKER_HUB_CRED_USR = credentials('docker-hub-nofarpanker').username
-        DOCKER_HUB_CRED_PSW = credentials('docker-hub-nofarpanker').password
+        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker') // Username with password
         SNYK_TOKEN = credentials('SNYK_TOKEN')
     }
 
     stages {
         stage('Checkout SCM') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
         stage('Prepare Environment') {
@@ -39,9 +36,7 @@ pipeline {
         }
 
         stage('Run Unit Tests') {
-            steps {
-                sh 'python3 -m unittest discover'
-            }
+            steps { sh 'python3 -m unittest discover' }
         }
 
         stage('Clean Old Containers & Images') {
@@ -95,12 +90,8 @@ pipeline {
             docker rmi -f auth-service backend jewelry-store || true
             '''
         }
-        success {
-            echo "✅ הבנייה הצליחה!"
-        }
-        failure {
-            echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס"
-        }
+        success { echo "✅ הבנייה הצליחה!" }
+        failure { echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס" }
     }
 }
 
