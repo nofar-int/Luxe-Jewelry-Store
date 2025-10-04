@@ -4,6 +4,7 @@ pipeline {
     environment {
         DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
         SNYK_TOKEN      = credentials('SNYK_TOKEN')
+        SNYK_IGNORE_DIR = "security/snyk"
     }
 
     stages {
@@ -41,19 +42,13 @@ pipeline {
             steps {
                 sh '''
                    echo "=== בונה ומעלה auth-service ==="
-                   docker build --pull --no-cache \
-                       -t nofarpanker/luxe-auth:latest \
-                       -f infra/Dockerfile.auth .
+                   docker build --pull --no-cache -t nofarpanker/luxe-auth:latest -f infra/Dockerfile.auth .
 
                    echo "=== בונה ומעלה backend-service ==="
-                   docker build --pull --no-cache \
-                       -t nofarpanker/luxe-backend:latest \
-                       -f infra/Dockerfile.backend .
+                   docker build --pull --no-cache -t nofarpanker/luxe-backend:latest -f infra/Dockerfile.backend .
 
                    echo "=== בונה ומעלה frontend-service ==="
-                   docker build --pull --no-cache \
-                       -t nofarpanker/luxe-frontend:latest \
-                       -f infra/Dockerfile.frontend .
+                   docker build --pull --no-cache -t nofarpanker/luxe-frontend:latest -f infra/Dockerfile.frontend .
 
                    echo "=== העלאת התמונות ל-Docker Hub ==="
                    echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED_USR --password-stdin
@@ -64,16 +59,24 @@ pipeline {
             }
         }
 
-        stage('Snyk Monitor') {
+        stage('Snyk Security Scan') {
             steps {
                 sh '''
-                   echo "מריץ Snyk Monitor..."
-                   # מאפשר המשך גם אם Snyk מחזיר שגיאה
-                   set +e
-                   snyk container monitor nofarpanker/luxe-auth:latest --file=infra/Dockerfile.auth
-                   snyk container monitor nofarpanker/luxe-backend:latest --file=infra/Dockerfile.backend
-                   snyk container monitor nofarpanker/luxe-frontend:latest --file=infra/Dockerfile.frontend
-                   set -e
+                   echo "מריץ Snyk סריקות לכל השירותים..."
+
+                   for service in auth backend frontend; do
+                       DOCKER_IMAGE="nofarpanker/luxe-${service}:latest"
+                       DOCKER_FILE="infra/Dockerfile.${service}"
+                       IGNORE_FILE="$SNYK_IGNORE_DIR/snyk-${service}-ignore.txt"
+
+                       echo "== סריקת $service =="
+                       if [ -f "$IGNORE_FILE" ]; then
+                           echo "קובץ Ignore נמצא: $IGNORE_FILE"
+                           snyk container test $DOCKER_IMAGE --file=$DOCKER_FILE --all-projects --ignore-policy=$IGNORE_FILE || true
+                       else
+                           snyk container test $DOCKER_IMAGE --file=$DOCKER_FILE --all-projects || true
+                       fi
+                   done
                 '''
             }
         }
@@ -90,4 +93,5 @@ pipeline {
         }
     }
 }
+
 
