@@ -40,7 +40,7 @@ pipeline {
         stage('Build & Push Services') {
             steps {
                 sh '''
-                   echo "=== בונה ומעלה auth-service (Dockerfile ב-infra, קבצים בשורש) ==="
+                   echo "=== בונה ומעלה auth-service ==="
                    docker build --pull --no-cache \
                        -t nofarpanker/luxe-auth:latest \
                        -f infra/Dockerfile.auth .
@@ -48,12 +48,12 @@ pipeline {
                    echo "=== בונה ומעלה backend-service ==="
                    docker build --pull --no-cache \
                        -t nofarpanker/luxe-backend:latest \
-                       -f infra/Dockerfile.backend backend
+                       -f infra/Dockerfile.backend .
 
                    echo "=== בונה ומעלה frontend-service ==="
                    docker build --pull --no-cache \
                        -t nofarpanker/luxe-frontend:latest \
-                       -f infra/Dockerfile.frontend jewelry-store
+                       -f infra/Dockerfile.frontend .
 
                    echo "=== העלאת התמונות ל-Docker Hub ==="
                    echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED_USR --password-stdin
