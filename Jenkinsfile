@@ -1,7 +1,7 @@
 pipeline {
-    agent { label 'jenkins-agent' } // ודאי שיש לך agent בשם הזה
+    agent { label 'jenkins-agent' }
     environment {
-        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker') // Docker Hub ID + Password
+        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
         SNYK_TOKEN = credentials('SNYK_TOKEN')
     }
     stages {
@@ -55,18 +55,19 @@ pipeline {
             steps {
                 script {
                     def services = [
-                        [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth', context: '.'],
-                        [name: 'backend', dockerfile: 'infra/Dockerfile.backend', context: '.'],
-                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.']
+                        [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth', context: 'auth-service'],
+                        [name: 'backend', dockerfile: 'infra/Dockerfile.backend', context: 'backend'],
+                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: 'jewelry-store']
                     ]
 
                     for (s in services) {
                         sh """
                         echo "=== Build & Push ${s.name} ==="
                         docker build -f ${s.dockerfile} -t ${s.name} ${s.context}
+                        echo "${DOCKER_HUB_CRED_PSW}" | docker login -u "${DOCKER_HUB_CRED_USR}" --password-stdin
                         docker tag ${s.name} ${DOCKER_HUB_CRED_USR}/${s.name}:latest
-                        docker login -u ${DOCKER_HUB_CRED_USR} -p ${DOCKER_HUB_CRED_PSW}
                         docker push ${DOCKER_HUB_CRED_USR}/${s.name}:latest
+                        docker logout
                         """
                     }
                 }
@@ -101,6 +102,7 @@ pipeline {
         }
     }
 }
+
 
 
 
