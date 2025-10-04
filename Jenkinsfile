@@ -1,6 +1,9 @@
 pipeline {
     agent {
-        label 'jenkins-agent'  // רץ על ה-Agent החדש עם Docker
+        docker { 
+            image 'nofarpanker/jenkins-agent:latest'
+            args '-v /var/run/docker.sock:/var/run/docker.sock -v $PWD:/home/jenkins/workspace -w /home/jenkins/workspace'
+        }
     }
 
     environment {
@@ -22,8 +25,8 @@ pipeline {
                 echo "=== בדיקת התקנות בסיסיות ==="
                 docker --version
                 git --version
-                python3 --version
-                pip3 --version
+                python3 --version || echo "Python לא מותקן ב-Agent (ישתמש ב-Docker בעת הריצה)"
+                pip3 --version || echo "pip לא מותקן ב-Agent (ישתמש ב-Docker בעת הריצה)"
                 snyk --version || echo "Snyk לא מותקן"
                 '''
             }
@@ -32,8 +35,7 @@ pipeline {
         stage('Lint Code') {
             steps {
                 sh '''
-                echo "=== הרצת flake8 ==="
-                flake8 .
+                docker run --rm -v $PWD:/app -w /app python:3.11 bash -c "pip install flake8 && flake8 ."
                 '''
             }
         }
@@ -41,8 +43,7 @@ pipeline {
         stage('Run Unit Tests') {
             steps {
                 sh '''
-                echo "=== הרצת pytest ==="
-                pytest --junitxml=results.xml --html=report.html tests/
+                docker run --rm -v $PWD:/app -w /app python:3.11 bash -c "pip install -r environments-ci.txt pytest pytest-html && pytest --junitxml=results.xml --html=report.html tests/"
                 '''
             }
             post {
@@ -60,7 +61,6 @@ pipeline {
         stage('Clean Old Containers & Images') {
             steps {
                 sh '''
-                echo "=== ניקוי קונטיינרים ואימג'ים ישנים ==="
                 docker rm -f $(docker ps -aq) || true
                 docker rmi -f luxe-jewelry-store-auth || true
                 docker rmi -f luxe-jewelry-store-backend || true
@@ -76,7 +76,7 @@ pipeline {
                 docker build -t luxe-jewelry-store-auth auth-service/
                 docker build -t luxe-jewelry-store-backend backend/
                 docker build -t luxe-jewelry-store-jewelry-store frontend/
-
+                
                 echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED --password-stdin
                 docker push luxe-jewelry-store-auth
                 docker push luxe-jewelry-store-backend
@@ -115,6 +115,7 @@ pipeline {
         }
     }
 }
+
 
 
 
