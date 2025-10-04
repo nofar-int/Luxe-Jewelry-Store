@@ -3,12 +3,17 @@ pipeline {
 
     environment {
         SNYK_TOKEN = credentials('SNYK_TOKEN')
+        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
     }
 
     stages {
         stage('Checkout SCM') {
             steps {
-                checkout scm
+                git(
+                    url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git',
+                    credentialsId: 'github-credentials-id',
+                    branch: 'main'
+                )
             }
         }
 
@@ -28,8 +33,8 @@ pipeline {
         stage('Lint Code') {
             steps {
                 sh '''
+                    echo "=== הרצת flake8 ==="
                     if command -v flake8 >/dev/null 2>&1; then
-                        echo "=== הרצת flake8 ==="
                         flake8 .
                     else
                         echo "flake8 לא מותקן, דלגתי על שלב זה"
@@ -40,7 +45,10 @@ pipeline {
 
         stage('Run Unit Tests') {
             steps {
-                sh 'python3 -m unittest discover'
+                sh '''
+                    echo "=== הרצת Unit Tests ==="
+                    python3 -m unittest discover
+                '''
             }
         }
 
@@ -55,48 +63,41 @@ pipeline {
 
         stage('Build & Push Services') {
             steps {
-                dir('infra') { // משנה לתיקיית infra
-                    withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker', 
-                                                     usernameVariable: 'DOCKER_USER', 
-                                                     passwordVariable: 'DOCKER_PASS')]) {
-                        sh '''
-                            echo "=== Docker login ==="
-                            docker login -u $DOCKER_USER -p $DOCKER_PASS
+                sh '''
+                    echo "=== Build & Push Services ==="
+                    docker build -t luxe-jewelry-store-auth ./infra/auth
+                    docker build -t luxe-jewelry-store-backend ./infra/backend
+                    docker build -t luxe-jewelry-store-jewelry-store ./infra/jewelry-store
 
-                            echo "=== Build & Push Services ==="
-                            docker build -t luxe-jewelry-store-auth ./auth
-                            docker build -t luxe-jewelry-store-backend ./backend
-                            docker build -t luxe-jewelry-store-jewelry-store ./jewelry-store
-
-                            docker push luxe-jewelry-store-auth
-                            docker push luxe-jewelry-store-backend
-                            docker push luxe-jewelry-store-jewelry-store
-                        '''
-                    }
-                }
+                    echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED --password-stdin
+                    docker push luxe-jewelry-store-auth
+                    docker push luxe-jewelry-store-backend
+                    docker push luxe-jewelry-store-jewelry-store
+                '''
             }
         }
 
         stage('Snyk Security Scan') {
             steps {
-                sh 'snyk test --all-projects'
+                sh '''
+                    snyk container test luxe-jewelry-store-auth --docker
+                    snyk container test luxe-jewelry-store-backend --docker
+                    snyk container test luxe-jewelry-store-jewelry-store --docker
+                '''
             }
         }
     }
 
     post {
         always {
-            node {
-                sh '''
-                    docker rm -f luxe-jewelry-store-auth luxe-jewelry-store-backend luxe-jewelry-store-jewelry-store || true
-                    docker rmi -f luxe-jewelry-store-auth luxe-jewelry-store-backend luxe-jewelry-store-jewelry-store || true
-                '''
-                echo 'ניקוי משאבים סופי...'
-            }
+            echo 'ניקוי משאבים סופי...'
+            sh '''
+                docker rm -f luxe-jewelry-store-auth luxe-jewelry-store-backend luxe-jewelry-store-jewelry-store || true
+                docker rmi -f luxe-jewelry-store-auth luxe-jewelry-store-backend luxe-jewelry-store-jewelry-store || true
+            '''
         }
     }
 }
-
 
 
 
