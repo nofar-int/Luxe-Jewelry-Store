@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKER_HUB_CRED = credentials('docker-hub-username')
         DOCKER_HUB_CRED_PSW = credentials('docker-hub-password')
-        SNYK_TOKEN = credentials('snyk-api-token')
+        SNYK_TOKEN = credentials('SNYK_TOKEN')
     }
 
     stages {
