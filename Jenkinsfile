@@ -1,31 +1,25 @@
 pipeline {
-    agent { label 'jenkins-agent' }
-
+    agent { label 'jenkins-agent' } // ודאי שיש לך agent בשם הזה
     environment {
+        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker') // Docker Hub ID + Password
         SNYK_TOKEN = credentials('SNYK_TOKEN')
-        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
     }
-
     stages {
         stage('Checkout SCM') {
             steps {
-                git(
-                    url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git',
-                    credentialsId: 'github-credentials-id',
-                    branch: 'main'
-                )
+                checkout scm
             }
         }
 
         stage('Prepare Environment') {
             steps {
                 sh '''
-                    echo "=== בדיקת התקנות בסיסיות ==="
-                    docker --version
-                    git --version
-                    python3 --version
-                    pip3 --version
-                    snyk --version
+                echo "=== בדיקת התקנות בסיסיות ==="
+                docker --version
+                git --version
+                python3 --version
+                pip3 --version
+                snyk --version
                 '''
             }
         }
@@ -33,56 +27,59 @@ pipeline {
         stage('Lint Code') {
             steps {
                 sh '''
-                    echo "=== הרצת flake8 ==="
-                    if command -v flake8 >/dev/null 2>&1; then
-                        flake8 .
-                    else
-                        echo "flake8 לא מותקן, דלגתי על שלב זה"
-                    fi
+                if command -v flake8 >/dev/null 2>&1; then
+                    flake8 .
+                else
+                    echo "flake8 לא מותקן, דלגתי על שלב זה"
+                fi
                 '''
             }
         }
 
         stage('Run Unit Tests') {
             steps {
-                sh '''
-                    echo "=== הרצת Unit Tests ==="
-                    python3 -m unittest discover
-                '''
+                sh 'python3 -m unittest discover'
             }
         }
 
         stage('Clean Old Containers & Images') {
             steps {
                 sh '''
-                    docker rm -f luxe-jewelry-store-auth luxe-jewelry-store-backend luxe-jewelry-store-jewelry-store || true
-                    docker rmi -f luxe-jewelry-store-auth luxe-jewelry-store-backend luxe-jewelry-store-jewelry-store || true
+                docker rm -f auth-service backend jewelry-store || true
+                docker rmi -f auth-service backend jewelry-store || true
                 '''
             }
         }
 
         stage('Build & Push Services') {
             steps {
-                sh '''
-                    echo "=== Build & Push Services ==="
-                    docker build -t luxe-jewelry-store-auth ./infra/auth
-                    docker build -t luxe-jewelry-store-backend ./infra/backend
-                    docker build -t luxe-jewelry-store-jewelry-store ./infra/jewelry-store
+                script {
+                    def services = [
+                        [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth', context: 'auth-service'],
+                        [name: 'backend', dockerfile: 'infra/Dockerfile.backend', context: 'backend'],
+                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: 'jewelry-store']
+                    ]
 
-                    echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED --password-stdin
-                    docker push luxe-jewelry-store-auth
-                    docker push luxe-jewelry-store-backend
-                    docker push luxe-jewelry-store-jewelry-store
-                '''
+                    for (s in services) {
+                        sh """
+                        echo "=== Build & Push ${s.name} ==="
+                        docker build -f ${s.dockerfile} -t ${s.name} ./${s.context}
+                        docker tag ${s.name} ${DOCKER_HUB_CRED}/${s.name}:latest
+                        docker login -u ${DOCKER_HUB_CRED_USR} -p ${DOCKER_HUB_CRED_PSW}
+                        docker push ${DOCKER_HUB_CRED}/${s.name}:latest
+                        """
+                    }
+                }
             }
         }
 
         stage('Snyk Security Scan') {
             steps {
                 sh '''
-                    snyk container test luxe-jewelry-store-auth --docker
-                    snyk container test luxe-jewelry-store-backend --docker
-                    snyk container test luxe-jewelry-store-jewelry-store --docker
+                echo "=== Running Snyk Scan ==="
+                snyk container test ${DOCKER_HUB_CRED}/auth-service:latest --org=my-org || true
+                snyk container test ${DOCKER_HUB_CRED}/backend:latest --org=my-org || true
+                snyk container test ${DOCKER_HUB_CRED}/jewelry-store:latest --org=my-org || true
                 '''
             }
         }
@@ -90,11 +87,17 @@ pipeline {
 
     post {
         always {
-            echo 'ניקוי משאבים סופי...'
             sh '''
-                docker rm -f luxe-jewelry-store-auth luxe-jewelry-store-backend luxe-jewelry-store-jewelry-store || true
-                docker rmi -f luxe-jewelry-store-auth luxe-jewelry-store-backend luxe-jewelry-store-jewelry-store || true
+            echo "ניקוי משאבים סופי..."
+            docker rm -f auth-service backend jewelry-store || true
+            docker rmi -f auth-service backend jewelry-store || true
             '''
+        }
+        success {
+            echo "✅ הבנייה הצליחה!"
+        }
+        failure {
+            echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס"
         }
     }
 }
