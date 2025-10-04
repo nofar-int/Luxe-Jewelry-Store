@@ -1,12 +1,9 @@
 pipeline {
-    agent {
-        label 'jenkins-agent' // שם ה-agent מהפלט שלך
-    }
+    agent any
 
     environment {
         DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
         SNYK_TOKEN = credentials('SNYK_TOKEN')
-        VENV_DIR = 'venv'
     }
 
     stages {
@@ -33,11 +30,9 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
-                echo "=== יצירת Virtual Environment והתקנת תלותים ==="
-                python3 -m venv $VENV_DIR
-                source $VENV_DIR/bin/activate
-                pip install --upgrade pip
-                pip install -r environments-ci.txt
+                echo "=== התקנת תלותים ==="
+                pip3 install --upgrade pip
+                pip3 install -r environments-ci.txt
                 '''
             }
         }
@@ -45,7 +40,6 @@ pipeline {
         stage('Lint Code') {
             steps {
                 sh '''
-                source $VENV_DIR/bin/activate
                 flake8 .
                 '''
             }
@@ -54,7 +48,6 @@ pipeline {
         stage('Run Unit Tests') {
             steps {
                 sh '''
-                source $VENV_DIR/bin/activate
                 pytest --junitxml=results.xml --html=report.html tests/
                 '''
             }
@@ -74,9 +67,9 @@ pipeline {
             steps {
                 sh '''
                 docker rm -f $(docker ps -aq) || true
-                docker rmi -f nofarpanker/luxe-auth:latest || true
-                docker rmi -f nofarpanker/luxe-backend:latest || true
-                docker rmi -f nofarpanker/luxe-frontend:latest || true
+                docker rmi -f luxe-jewelry-store-auth || true
+                docker rmi -f luxe-jewelry-store-backend || true
+                docker rmi -f luxe-jewelry-store-jewelry-store || true
                 '''
             }
         }
@@ -85,14 +78,14 @@ pipeline {
             steps {
                 sh '''
                 echo "=== Build & Push Docker Images ==="
-                docker build -t nofarpanker/luxe-auth:latest auth-service/
-                docker build -t nofarpanker/luxe-backend:latest backend/
-                docker build -t nofarpanker/luxe-frontend:latest frontend/
+                docker build -t luxe-jewelry-store-auth auth-service/
+                docker build -t luxe-jewelry-store-backend backend/
+                docker build -t luxe-jewelry-store-jewelry-store frontend/
                 
                 echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED --password-stdin
-                docker push nofarpanker/luxe-auth:latest
-                docker push nofarpanker/luxe-backend:latest
-                docker push nofarpanker/luxe-frontend:latest
+                docker push luxe-jewelry-store-auth
+                docker push luxe-jewelry-store-backend
+                docker push luxe-jewelry-store-jewelry-store
                 '''
             }
         }
@@ -100,10 +93,9 @@ pipeline {
         stage('Snyk Security Scan') {
             steps {
                 sh '''
-                source $VENV_DIR/bin/activate
-                snyk container test nofarpanker/luxe-auth:latest --file=auth-service/Dockerfile
-                snyk container test nofarpanker/luxe-backend:latest --file=backend/Dockerfile
-                snyk container test nofarpanker/luxe-frontend:latest --file=frontend/Dockerfile
+                snyk container test luxe-jewelry-store-auth --file=auth-service/Dockerfile
+                snyk container test luxe-jewelry-store-backend --file=backend/Dockerfile
+                snyk container test luxe-jewelry-store-jewelry-store --file=frontend/Dockerfile
                 '''
             }
         }
@@ -113,9 +105,9 @@ pipeline {
         always {
             echo "ניקוי משאבים..."
             sh '''
-            docker rmi -f nofarpanker/luxe-auth:latest || true
-            docker rmi -f nofarpanker/luxe-backend:latest || true
-            docker rmi -f nofarpanker/luxe-frontend:latest || true
+            docker rmi -f luxe-jewelry-store-auth || true
+            docker rmi -f luxe-jewelry-store-backend || true
+            docker rmi -f luxe-jewelry-store-jewelry-store || true
             '''
         }
 
@@ -128,7 +120,6 @@ pipeline {
         }
     }
 }
-
 
 
 
