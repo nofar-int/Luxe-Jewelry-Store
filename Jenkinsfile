@@ -1,63 +1,77 @@
 pipeline {
-    agent any
+    agent { label 'jenkins-agent' }
 
     environment {
-        DOCKER_COMPOSE_FILE = 'docker-compose.yml'
+        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
+        SNYK_TOKEN      = credentials('SNYK_TOKEN')
     }
 
     stages {
+
+        stage('Prepare Environment') {
+            steps {
+                sh '''
+                   echo "=== בדיקת התקנות בסיסיות ==="
+                   docker --version
+                   git --version
+                   python3 --version
+                   pip3 --version
+                   snyk --version || true
+                '''
+            }
+        }
+
         stage('Checkout') {
             steps {
-                checkout scm
+                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git', branch: 'main'
             }
         }
 
-        stage('Build Docker Images') {
+        stage('Clean Old Containers & Images') {
             steps {
-                script {
-                    echo 'Building Docker images for all services...'
-                    sh 'docker compose build'
-                }
+                sh '''
+                   echo "ניקוי קונטיינרים ותמונות ישנות..."
+                   docker ps -aq --filter "name=luxe-" | xargs -r -I{} docker rm -f {} || true
+                   docker images "nofarpanker/luxe-*" -q | xargs -r docker rmi -f || true
+                '''
             }
         }
 
-        stage('Run Services') {
+        stage('Build & Push Services') {
             steps {
-                script {
-                    echo 'Starting services...'
-                    sh 'docker compose up -d'
-                }
+                sh '''
+                   echo "=== בונה ומעלה auth-service (Dockerfile ב-infra, קבצים בשורש) ==="
+                   docker build --pull --no-cache \
+                       -t nofarpanker/luxe-auth:latest \
+                       -f infra/Dockerfile.auth .
+
+                   echo "=== בונה ומעלה backend-service ==="
+                   docker build --pull --no-cache \
+                       -t nofarpanker/luxe-backend:latest \
+                       -f infra/Dockerfile.backend backend
+
+                   echo "=== בונה ומעלה frontend-service ==="
+                   docker build --pull --no-cache \
+                       -t nofarpanker/luxe-frontend:latest \
+                       -f infra/Dockerfile.frontend jewelry-store
+
+                   echo "=== העלאת התמונות ל-Docker Hub ==="
+                   echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED_USR --password-stdin
+                   docker push nofarpanker/luxe-auth:latest
+                   docker push nofarpanker/luxe-backend:latest
+                   docker push nofarpanker/luxe-frontend:latest
+                '''
             }
         }
 
-        stage('Test auth-service') {
+        stage('Snyk Monitor') {
             steps {
-                script {
-                    echo 'Testing auth-service...'
-                    // כאן נריץ בדיקות אם יש תיקיית test או סקריפט package.json
-                    dir('auth-service') {
-                        sh 'npm install'
-                        sh 'npm test || echo "Tests failed but continuing..."'
-                    }
-                }
-            }
-        }
-
-        stage('Stop Services') {
-            steps {
-                script {
-                    echo 'Stopping all containers...'
-                    sh 'docker compose down'
-                }
-            }
-        }
-    }
-
-    post {
-        always {
-            script {
-                echo 'Cleaning up Docker resources...'
-                sh 'docker system prune -f'
+                sh '''
+                   echo "מריץ Snyk Monitor..."
+                   snyk container monitor nofarpanker/luxe-auth:latest --file=infra/Dockerfile.auth || true
+                   snyk container monitor nofarpanker/luxe-backend:latest --file=infra/Dockerfile.backend || true
+                   snyk container monitor nofarpanker/luxe-frontend:latest --file=infra/Dockerfile.frontend || true
+                '''
             }
         }
     }
