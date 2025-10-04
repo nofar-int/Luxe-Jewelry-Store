@@ -68,11 +68,25 @@ pipeline {
             steps {
                 sh '''
                    echo "מריץ Snyk Monitor..."
-                   snyk container monitor nofarpanker/luxe-auth:latest --file=infra/Dockerfile.auth || true
-                   snyk container monitor nofarpanker/luxe-backend:latest --file=infra/Dockerfile.backend || true
-                   snyk container monitor nofarpanker/luxe-frontend:latest --file=infra/Dockerfile.frontend || true
+                   # מאפשר המשך גם אם Snyk מחזיר שגיאה
+                   set +e
+                   snyk container monitor nofarpanker/luxe-auth:latest --file=infra/Dockerfile.auth
+                   snyk container monitor nofarpanker/luxe-backend:latest --file=infra/Dockerfile.backend
+                   snyk container monitor nofarpanker/luxe-frontend:latest --file=infra/Dockerfile.frontend
+                   set -e
                 '''
             }
+        }
+    }
+
+    post {
+        always {
+            echo "ניקוי Docker images בסיום..."
+            sh '''
+                docker rmi nofarpanker/luxe-auth:latest || true
+                docker rmi nofarpanker/luxe-backend:latest || true
+                docker rmi nofarpanker/luxe-frontend:latest || true
+            '''
         }
     }
 }
