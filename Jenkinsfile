@@ -86,8 +86,8 @@ pipeline {
                 docker build -t nofarpanker/luxe-auth:latest auth-service/
                 docker build -t nofarpanker/luxe-backend:latest backend/
                 docker build -t nofarpanker/luxe-frontend:latest frontend/
-                
-                echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED --password-stdin
+
+                echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED_USR --password-stdin
                 docker push nofarpanker/luxe-auth:latest
                 docker push nofarpanker/luxe-backend:latest
                 docker push nofarpanker/luxe-frontend:latest
