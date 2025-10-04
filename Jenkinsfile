@@ -1,9 +1,11 @@
 pipeline {
-    agent { label 'jenkins-agent' } // ודאי שיש לך agent בשם הזה
+    agent { label 'jenkins-agent' }
     environment {
-        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker') // Docker Hub ID + Password
+        DOCKER_HUB_CRED_USR = credentials('docker-hub-nofarpanker').username
+        DOCKER_HUB_CRED_PSW = credentials('docker-hub-nofarpanker').password
         SNYK_TOKEN = credentials('SNYK_TOKEN')
     }
+
     stages {
         stage('Checkout SCM') {
             steps {
@@ -64,9 +66,9 @@ pipeline {
                         sh """
                         echo "=== Build & Push ${s.name} ==="
                         docker build -f ${s.dockerfile} -t ${s.name} ./${s.context}
-                        docker tag ${s.name} ${DOCKER_HUB_CRED}/${s.name}:latest
-                        docker login -u ${DOCKER_HUB_CRED_USR} -p ${DOCKER_HUB_CRED_PSW}
-                        docker push ${DOCKER_HUB_CRED}/${s.name}:latest
+                        docker tag ${s.name} ${DOCKER_HUB_CRED_USR}/${s.name}:latest
+                        echo "${DOCKER_HUB_CRED_PSW}" | docker login -u "${DOCKER_HUB_CRED_USR}" --password-stdin
+                        docker push ${DOCKER_HUB_CRED_USR}/${s.name}:latest
                         """
                     }
                 }
@@ -77,9 +79,9 @@ pipeline {
             steps {
                 sh '''
                 echo "=== Running Snyk Scan ==="
-                snyk container test ${DOCKER_HUB_CRED}/auth-service:latest --org=my-org || true
-                snyk container test ${DOCKER_HUB_CRED}/backend:latest --org=my-org || true
-                snyk container test ${DOCKER_HUB_CRED}/jewelry-store:latest --org=my-org || true
+                snyk container test ${DOCKER_HUB_CRED_USR}/auth-service:latest --org=my-org || true
+                snyk container test ${DOCKER_HUB_CRED_USR}/backend:latest --org=my-org || true
+                snyk container test ${DOCKER_HUB_CRED_USR}/jewelry-store:latest --org=my-org || true
                 '''
             }
         }
