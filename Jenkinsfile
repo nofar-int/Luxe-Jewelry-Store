@@ -1,5 +1,7 @@
 pipeline {
-    agent any
+    agent {
+        label 'jenkins-agent'  // רץ על ה-Agent החדש עם Docker
+    }
 
     environment {
         DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
@@ -27,19 +29,10 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            steps {
-                sh '''
-                echo "=== התקנת תלותים ==="
-                pip3 install --upgrade pip
-                pip3 install -r environments-ci.txt
-                '''
-            }
-        }
-
         stage('Lint Code') {
             steps {
                 sh '''
+                echo "=== הרצת flake8 ==="
                 flake8 .
                 '''
             }
@@ -48,6 +41,7 @@ pipeline {
         stage('Run Unit Tests') {
             steps {
                 sh '''
+                echo "=== הרצת pytest ==="
                 pytest --junitxml=results.xml --html=report.html tests/
                 '''
             }
@@ -66,6 +60,7 @@ pipeline {
         stage('Clean Old Containers & Images') {
             steps {
                 sh '''
+                echo "=== ניקוי קונטיינרים ואימג'ים ישנים ==="
                 docker rm -f $(docker ps -aq) || true
                 docker rmi -f luxe-jewelry-store-auth || true
                 docker rmi -f luxe-jewelry-store-backend || true
@@ -81,7 +76,7 @@ pipeline {
                 docker build -t luxe-jewelry-store-auth auth-service/
                 docker build -t luxe-jewelry-store-backend backend/
                 docker build -t luxe-jewelry-store-jewelry-store frontend/
-                
+
                 echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED --password-stdin
                 docker push luxe-jewelry-store-auth
                 docker push luxe-jewelry-store-backend
@@ -103,7 +98,7 @@ pipeline {
 
     post {
         always {
-            echo "ניקוי משאבים..."
+            echo "ניקוי משאבים סופי..."
             sh '''
             docker rmi -f luxe-jewelry-store-auth || true
             docker rmi -f luxe-jewelry-store-backend || true
@@ -120,6 +115,7 @@ pipeline {
         }
     }
 }
+
 
 
 
