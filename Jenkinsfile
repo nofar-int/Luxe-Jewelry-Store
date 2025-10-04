@@ -1,7 +1,7 @@
 pipeline {
-    agent { label 'jenkins-agent' }
+    agent { label 'jenkins-agent' } // ודאי שיש לך agent בשם הזה
     environment {
-        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
+        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker') // Docker Hub ID + Password
         SNYK_TOKEN = credentials('SNYK_TOKEN')
     }
     stages {
@@ -28,7 +28,7 @@ pipeline {
             steps {
                 sh '''
                 if command -v flake8 >/dev/null 2>&1; then
-                    flake8 . 
+                    flake8 .
                 else
                     echo "flake8 לא מותקן, דלגתי על שלב זה"
                 fi
@@ -55,18 +55,18 @@ pipeline {
             steps {
                 script {
                     def services = [
-                        [name: 'auth-service', dockerfile: 'Luxe-Jewelry-Store/infra/Dockerfile.auth'],
-                        [name: 'backend', dockerfile: 'Luxe-Jewelry-Store/infra/Dockerfile.backend'],
-                        [name: 'jewelry-store', dockerfile: 'Luxe-Jewelry-Store/infra/Dockerfile.frontend']
+                        [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth', context: '.'],
+                        [name: 'backend', dockerfile: 'infra/Dockerfile.backend', context: '.'],
+                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.']
                     ]
 
                     for (s in services) {
                         sh """
                         echo "=== Build & Push ${s.name} ==="
-                        docker build -f ${s.dockerfile} -t ${s.name} ./Luxe-Jewelry-Store
-                        docker tag ${s.name} ${DOCKER_HUB_CRED}/${s.name}:latest
+                        docker build -f ${s.dockerfile} -t ${s.name} ${s.context}
+                        docker tag ${s.name} ${DOCKER_HUB_CRED_USR}/${s.name}:latest
                         docker login -u ${DOCKER_HUB_CRED_USR} -p ${DOCKER_HUB_CRED_PSW}
-                        docker push ${DOCKER_HUB_CRED}/${s.name}:latest
+                        docker push ${DOCKER_HUB_CRED_USR}/${s.name}:latest
                         """
                     }
                 }
@@ -77,9 +77,9 @@ pipeline {
             steps {
                 sh '''
                 echo "=== Running Snyk Scan ==="
-                snyk container test ${DOCKER_HUB_CRED}/auth-service:latest --org=my-org || true
-                snyk container test ${DOCKER_HUB_CRED}/backend:latest --org=my-org || true
-                snyk container test ${DOCKER_HUB_CRED}/jewelry-store:latest --org=my-org || true
+                snyk container test ${DOCKER_HUB_CRED_USR}/auth-service:latest --org=my-org || true
+                snyk container test ${DOCKER_HUB_CRED_USR}/backend:latest --org=my-org || true
+                snyk container test ${DOCKER_HUB_CRED_USR}/jewelry-store:latest --org=my-org || true
                 '''
             }
         }
