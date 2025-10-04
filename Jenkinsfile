@@ -1,13 +1,14 @@
 pipeline {
-    agent { label 'jenkins-agent' }
+    agent { label 'jenkins-agent' } // ודאי שיש לך agent בשם הזה
     environment {
-        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker') // Username with password
+        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker') // Docker Hub ID + Password
         SNYK_TOKEN = credentials('SNYK_TOKEN')
     }
-
     stages {
         stage('Checkout SCM') {
-            steps { checkout scm }
+            steps {
+                checkout scm
+            }
         }
 
         stage('Prepare Environment') {
@@ -36,7 +37,9 @@ pipeline {
         }
 
         stage('Run Unit Tests') {
-            steps { sh 'python3 -m unittest discover' }
+            steps {
+                sh 'python3 -m unittest discover'
+            }
         }
 
         stage('Clean Old Containers & Images') {
@@ -52,17 +55,17 @@ pipeline {
             steps {
                 script {
                     def services = [
-                        [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth', context: 'auth-service'],
-                        [name: 'backend', dockerfile: 'infra/Dockerfile.backend', context: 'backend'],
-                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: 'jewelry-store']
+                        [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth', context: '.'],
+                        [name: 'backend', dockerfile: 'infra/Dockerfile.backend', context: '.'],
+                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.']
                     ]
 
                     for (s in services) {
                         sh """
                         echo "=== Build & Push ${s.name} ==="
-                        docker build -f ${s.dockerfile} -t ${s.name} ./${s.context}
+                        docker build -f ${s.dockerfile} -t ${s.name} ${s.context}
                         docker tag ${s.name} ${DOCKER_HUB_CRED_USR}/${s.name}:latest
-                        echo "${DOCKER_HUB_CRED_PSW}" | docker login -u "${DOCKER_HUB_CRED_USR}" --password-stdin
+                        docker login -u ${DOCKER_HUB_CRED_USR} -p ${DOCKER_HUB_CRED_PSW}
                         docker push ${DOCKER_HUB_CRED_USR}/${s.name}:latest
                         """
                     }
@@ -90,8 +93,12 @@ pipeline {
             docker rmi -f auth-service backend jewelry-store || true
             '''
         }
-        success { echo "✅ הבנייה הצליחה!" }
-        failure { echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס" }
+        success {
+            echo "✅ הבנייה הצליחה!"
+        }
+        failure {
+            echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס"
+        }
     }
 }
 
