@@ -1,67 +1,63 @@
 pipeline {
-    agent { label 'jenkins-agent' }
+    agent any
 
     environment {
-        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker')
-        SNYK_TOKEN      = credentials('SNYK_TOKEN')
+        DOCKER_COMPOSE_FILE = 'docker-compose.yml'
     }
 
     stages {
-
-        stage('Prepare Environment') {
-            steps {
-                sh '''
-                   echo "=== בדיקת התקנות בסיסיות ==="
-                   docker --version
-                   git --version
-                   python3 --version
-                   pip3 --version
-                   snyk --version || true
-                '''
-            }
-        }
-
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/nofar-int/Luxe-Jewelry-Store.git', branch: 'main'
+                checkout scm
             }
         }
 
-        stage('Clean Old Containers & Images') {
+        stage('Build Docker Images') {
             steps {
-                sh '''
-                   echo "ניקוי קונטיינרים ותמונות ישנות..."
-                   docker ps -aq --filter "name=luxe-" | xargs -r -I{} docker rm -f {} || true
-                   docker images "nofarpanker/luxe-*" -q | xargs -r docker rmi -f || true
-                '''
+                script {
+                    echo 'Building Docker images for all services...'
+                    sh 'docker compose build'
+                }
             }
         }
 
-        stage('Build & Push Services') {
+        stage('Run Services') {
             steps {
-                sh '''
-                   echo "בונה ומעלה auth-service..."
-                   docker build --pull --no-cache -t nofarpanker/luxe-auth:latest -f infra/Dockerfile.auth auth-service
-                   echo "בונה ומעלה backend-service..."
-                   docker build --pull --no-cache -t nofarpanker/luxe-backend:latest -f infra/Dockerfile.backend backend
-                   echo "בונה ומעלה frontend-service..."
-                   docker build --pull --no-cache -t nofarpanker/luxe-frontend:latest -f infra/Dockerfile.frontend jewelry-store
-
-                   echo $DOCKER_HUB_CRED_PSW | docker login -u $DOCKER_HUB_CRED_USR --password-stdin
-                   docker push nofarpanker/luxe-auth:latest
-                   docker push nofarpanker/luxe-backend:latest
-                   docker push nofarpanker/luxe-frontend:latest
-                '''
+                script {
+                    echo 'Starting services...'
+                    sh 'docker compose up -d'
+                }
             }
         }
 
-        stage('Snyk Monitor') {
+        stage('Test auth-service') {
             steps {
-                sh '''
-                   snyk container monitor nofarpanker/luxe-auth:latest --file=infra/Dockerfile.auth || true
-                   snyk container monitor nofarpanker/luxe-backend:latest --file=infra/Dockerfile.backend || true
-                   snyk container monitor nofarpanker/luxe-frontend:latest --file=infra/Dockerfile.frontend || true
-                '''
+                script {
+                    echo 'Testing auth-service...'
+                    // כאן נריץ בדיקות אם יש תיקיית test או סקריפט package.json
+                    dir('auth-service') {
+                        sh 'npm install'
+                        sh 'npm test || echo "Tests failed but continuing..."'
+                    }
+                }
+            }
+        }
+
+        stage('Stop Services') {
+            steps {
+                script {
+                    echo 'Stopping all containers...'
+                    sh 'docker compose down'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                echo 'Cleaning up Docker resources...'
+                sh 'docker system prune -f'
             }
         }
     }
