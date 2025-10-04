@@ -1,0 +1,8 @@
+# צור קובץ זה בתיקיית השורש של הפרויקט
+-r backend/requirements.txt
+-r auth-service/requirements.txt
+
+pytest
+pytest-html
+pytest-metadata
+pylint
