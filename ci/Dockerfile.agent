@@ -21,7 +21,7 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
     ./aws/install --bin-dir /usr/local/bin && \
     rm -rf aws awscliv2.zip
 
-# החזרה למשתמש Jenkins
+
 USER jenkins
 
 WORKDIR /home/jenkins

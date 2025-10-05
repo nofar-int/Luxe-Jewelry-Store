@@ -1,7 +1,6 @@
 pipeline {
     agent { label 'jenkins-agent' } // ודאי שיש לך agent בשם הזה
     environment {
-        DOCKER_HUB_CRED = credentials('docker-hub-nofarpanker') // Docker Hub ID + Password
         SNYK_TOKEN = credentials('SNYK_TOKEN')
     }
     stages {
@@ -62,14 +61,20 @@ pipeline {
                         [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.']
                     ]
 
-                    for (s in services) {
-                        sh """
-                        echo "=== Build & Push ${s.name} ==="
-                        docker build -f ${s.dockerfile} -t ${s.name} ${s.context}
-                        docker tag ${s.name} ${DOCKER_HUB_CRED_USR}/${s.name}:latest
-                        docker login -u ${DOCKER_HUB_CRED_USR} -p ${DOCKER_HUB_CRED_PSW}
-                        docker push ${DOCKER_HUB_CRED_USR}/${s.name}:latest
-                        """
+                    // שימוש ב-credentials ל-Docker Hub
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker', 
+                                                     usernameVariable: 'DOCKER_USER', 
+                                                     passwordVariable: 'DOCKER_PASS')]) {
+                        sh 'docker login -u $DOCKER_USER -p $DOCKER_PASS'
+
+                        for (s in services) {
+                            sh """
+                            echo "=== Build & Push ${s.name} ==="
+                            docker build -f ${s.dockerfile} -t ${s.name} ${s.context}
+                            docker tag ${s.name} $DOCKER_USER/${s.name}:latest
+                            docker push $DOCKER_USER/${s.name}:latest
+                            """
+                        }
                     }
                 }
             }
@@ -79,9 +84,9 @@ pipeline {
             steps {
                 sh '''
                 echo "=== Running Snyk Scan ==="
-                snyk container test ${DOCKER_HUB_CRED_USR}/auth-service:latest --file=infra/Dockerfile.auth --org=my-org || true
-                snyk container test ${DOCKER_HUB_CRED_USR}/backend:latest --file=infra/Dockerfile.backend --org=my-org || true
-                snyk container test ${DOCKER_HUB_CRED_USR}/jewelry-store:latest --file=infra/Dockerfile.frontend --org=my-org || true
+                snyk container test ${DOCKER_USER}/auth-service:latest --file=infra/Dockerfile.auth --org=my-org || true
+                snyk container test ${DOCKER_USER}/backend:latest --file=infra/Dockerfile.backend --org=my-org || true
+                snyk container test ${DOCKER_USER}/jewelry-store:latest --file=infra/Dockerfile.frontend --org=my-org || true
                 '''
             }
         }
@@ -93,6 +98,7 @@ pipeline {
             echo "ניקוי משאבים סופי..."
             docker rm -f auth-service backend jewelry-store || true
             docker rmi -f auth-service backend jewelry-store || true
+            docker logout || true
             '''
         }
         success {
@@ -103,8 +109,6 @@ pipeline {
         }
     }
 }
-
-
 
 
 
