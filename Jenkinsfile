@@ -80,14 +80,25 @@ pipeline {
             }
         }
 
-        stage('Snyk Security Scan') {
+        stage('Snyk Security Scan & Monitor') {
             steps {
-                sh '''
-                echo "=== Running Snyk Scan ==="
-                snyk container test ${DOCKER_USER}/auth-service:latest --file=infra/Dockerfile.auth --org=my-org || true
-                snyk container test ${DOCKER_USER}/backend:latest --file=infra/Dockerfile.backend --org=my-org || true
-                snyk container test ${DOCKER_USER}/jewelry-store:latest --file=infra/Dockerfile.frontend --org=my-org || true
-                '''
+                script {
+                    def images = [
+                        [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth'],
+                        [name: 'backend', dockerfile: 'infra/Dockerfile.backend'],
+                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend']
+                    ]
+
+                    for (img in images) {
+                        sh """
+                        echo "=== Snyk Test ${img.name} ==="
+                        snyk container test $DOCKER_USER/${img.name}:latest --file=${img.dockerfile} --org=my-org || true
+                        
+                        echo "=== Snyk Monitor ${img.name} ==="
+                        snyk container monitor $DOCKER_USER/${img.name}:latest --file=${img.dockerfile} --org=my-org || true
+                        """
+                    }
+                }
             }
         }
     }
