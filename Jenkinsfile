@@ -95,10 +95,10 @@ pipeline {
                         for (img in images) {
                             sh """
                             echo "=== Snyk Test ${img.name} ==="
-                            snyk container test $DOCKER_USER/${img.name}:latest --file=${img.dockerfile} --org=my-org || true
+                            snyk container test $DOCKER_USER/${img.name}:latest --file=${img.dockerfile} --org=nofar-int || true
                             
                             echo "=== Snyk Monitor ${img.name} ==="
-                            snyk container monitor $DOCKER_USER/${img.name}:latest --file=${img.dockerfile} --org=my-org || true
+                            snyk container monitor $DOCKER_USER/${img.name}:latest --file=${img.dockerfile} --org=nofar-int || true
                             """
                         }
                     }
