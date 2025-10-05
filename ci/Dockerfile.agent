@@ -7,22 +7,19 @@ RUN apt-get update && \
     apt-get install -y docker.io git python3 python3-pip unzip curl && \
     rm -rf /var/lib/apt/lists/*
 
+# התקנת Node.js 20 + npm עדכני (חובה לפני התקנת snyk)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g npm@latest
+
+# התקנת Snyk CLI דרך npm (עדיף על binary ישן)
+RUN npm install -g snyk@latest
+
 # התקנת AWS CLI v2
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
     unzip awscliv2.zip && \
     ./aws/install --bin-dir /usr/local/bin && \
     rm -rf aws awscliv2.zip
-
-# התקנת Snyk CLI
-RUN mkdir -p /usr/local/snyk && cd /usr/local/snyk && \
-    curl -s https://static.snyk.io/cli/v1.666.0/snyk-linux -o snyk && \
-    chmod +x snyk && \
-    ln -s /usr/local/snyk/snyk /usr/local/bin/snyk
-
-# התקנת Node.js 20 + npm עדכני (לפרונטאנד)
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    npm install -g npm@latest
 
 # החזרה למשתמש Jenkins
 USER jenkins

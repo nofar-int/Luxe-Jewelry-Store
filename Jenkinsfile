@@ -19,6 +19,8 @@ pipeline {
                 git --version
                 python3 --version
                 pip3 --version
+                node --version
+                npm --version
                 snyk --version
                 '''
             }
@@ -77,9 +79,9 @@ pipeline {
             steps {
                 sh '''
                 echo "=== Running Snyk Scan ==="
-                snyk container test ${DOCKER_HUB_CRED_USR}/auth-service:latest --org=my-org || true
-                snyk container test ${DOCKER_HUB_CRED_USR}/backend:latest --org=my-org || true
-                snyk container test ${DOCKER_HUB_CRED_USR}/jewelry-store:latest --org=my-org || true
+                snyk container test ${DOCKER_HUB_CRED_USR}/auth-service:latest --file=infra/Dockerfile.auth --org=my-org || true
+                snyk container test ${DOCKER_HUB_CRED_USR}/backend:latest --file=infra/Dockerfile.backend --org=my-org || true
+                snyk container test ${DOCKER_HUB_CRED_USR}/jewelry-store:latest --file=infra/Dockerfile.frontend --org=my-org || true
                 '''
             }
         }
@@ -101,6 +103,7 @@ pipeline {
         }
     }
 }
+
 
 
 
