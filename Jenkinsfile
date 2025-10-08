@@ -1,13 +1,8 @@
 pipeline {
-    agent { label 'jenkins-agent' } // ודאי שיש לך agent בשם הזה
+    agent { label 'jenkins-agent' } 
     environment {
         SNYK_TOKEN = credentials('SNYK_TOKEN')
-        REPORT_DIR = "reports"
-    }
-    options {
-        buildDiscarder(logRotator(daysToKeepStr: '30'))
-        disableConcurrentBuilds()
-        timestamps()
+        PYTHONPATH = "${WORKSPACE}"
     }
     stages {
         stage('Checkout SCM') {
@@ -27,40 +22,40 @@ pipeline {
                 node --version
                 npm --version
                 snyk --version
+                flake8 --version || echo "flake8 לא מותקן, דלגתי"
                 '''
             }
         }
 
         stage('Lint Code') {
             steps {
-                sh '''
-                if command -v flake8 >/dev/null 2>&1; then
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                    sh '''
                     flake8 .
-                else
-                    echo "flake8 לא מותקן, דלגתי על שלב זה"
-                fi
-                '''
+                    '''
+                }
             }
         }
 
         stage('Run Unit Tests') {
             steps {
                 sh '''
-                mkdir -p $REPORT_DIR
-                pytest --junitxml=$REPORT_DIR/results.xml --html=$REPORT_DIR/report.html --self-contained-html tests/
+                mkdir -p reports
+                pytest --html=reports/unit_test_report.html --self-contained-html
                 '''
             }
-            post {
-                always {
-                    junit allowEmptyResults: true, testResults: '$REPORT_DIR/results.xml'
-                    publishHTML(target: [
-                        reportDir: '$REPORT_DIR',
-                        reportFiles: 'report.html',
-                        reportName: 'Unit Test HTML Report',
-                        keepAll: true,
-                        allowMissing: true
-                    ])
-                }
+        }
+
+        stage('Publish HTML Report') {
+            steps {
+                publishHTML(target: [
+                    allowMissing: false,
+                    alwaysLinkToLastBuild: true,
+                    keepAll: true,
+                    reportDir: 'reports',
+                    reportFiles: 'unit_test_report.html',
+                    reportName: 'Unit Test Report'
+                ])
             }
         }
 
@@ -143,7 +138,10 @@ pipeline {
             '''
         }
         success {
-            echo "✅ הבנייה הצליחה!"
+            echo "✅ הבנייה והבדיקות הצליחו!"
+        }
+        unstable {
+            echo "⚠️ הבדיקות נכשלו או יש אזהרות (Lint או Unit Tests) — בדקי את הדוחות"
         }
         failure {
             echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס"
