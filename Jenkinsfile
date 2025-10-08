@@ -61,7 +61,6 @@ pipeline {
                         [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.']
                     ]
 
-                    // שימוש ב-credentials ל-Docker Hub
                     withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker', 
                                                      usernameVariable: 'DOCKER_USER', 
                                                      passwordVariable: 'DOCKER_PASS')]) {
@@ -95,10 +94,16 @@ pipeline {
                         for (img in images) {
                             sh """
                             echo "=== Snyk Test ${img.name} ==="
-                            snyk container test $DOCKER_USER/${img.name}:latest --file=${img.dockerfile} --org=nofar-int || true
-                            
+                            snyk container test $DOCKER_USER/${img.name}:latest \
+                                --file=${img.dockerfile} \
+                                --org=nofar-int \
+                                --ignore-file=./snyk-ignore.txt || true
+
                             echo "=== Snyk Monitor ${img.name} ==="
-                            snyk container monitor $DOCKER_USER/${img.name}:latest --file=${img.dockerfile} --org=nofar-int || true
+                            snyk container monitor $DOCKER_USER/${img.name}:latest \
+                                --file=${img.dockerfile} \
+                                --org=nofar-int \
+                                --ignore-file=./snyk-ignore.txt || true
                             """
                         }
                     }
