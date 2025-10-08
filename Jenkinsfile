@@ -2,6 +2,12 @@ pipeline {
     agent { label 'jenkins-agent' } // ודאי שיש לך agent בשם הזה
     environment {
         SNYK_TOKEN = credentials('SNYK_TOKEN')
+        REPORT_DIR = "reports"
+    }
+    options {
+        buildDiscarder(logRotator(daysToKeepStr: '30'))
+        disableConcurrentBuilds()
+        timestamps()
     }
     stages {
         stage('Checkout SCM') {
@@ -39,7 +45,22 @@ pipeline {
 
         stage('Run Unit Tests') {
             steps {
-                sh 'python3 -m unittest discover'
+                sh '''
+                mkdir -p $REPORT_DIR
+                pytest --junitxml=$REPORT_DIR/results.xml --html=$REPORT_DIR/report.html --self-contained-html tests/
+                '''
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: '$REPORT_DIR/results.xml'
+                    publishHTML(target: [
+                        reportDir: '$REPORT_DIR',
+                        reportFiles: 'report.html',
+                        reportName: 'Unit Test HTML Report',
+                        keepAll: true,
+                        allowMissing: true
+                    ])
+                }
             }
         }
 

@@ -2,9 +2,9 @@ FROM jenkins/agent:latest
 
 USER root
 
-# התקנת Docker CLI, git, Python3, pip, unzip, curl
+# התקנת Docker CLI, git, Python3, pip, unzip, curl, venv support, setuptools, flake8
 RUN apt-get update && \
-    apt-get install -y docker.io git python3 python3-pip unzip curl && \
+    apt-get install -y docker.io git python3 python3-pip python3-venv python3-setuptools unzip curl flake8 && \
     rm -rf /var/lib/apt/lists/*
 
 # התקנת Node.js 20 + npm עדכני (חובה לפני התקנת snyk)
@@ -21,6 +21,12 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
     ./aws/install --bin-dir /usr/local/bin && \
     rm -rf aws awscliv2.zip
 
+# יצירת virtual environment עבור pytest ו־pytest-html
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# עדכון pip והתקנת Pytest + Pytest-HTML בסביבה הווירטואלית
+RUN pip install --upgrade pip pytest pytest-html
 
 USER jenkins
 
