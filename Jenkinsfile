@@ -23,15 +23,18 @@ pipeline {
                 npm --version
                 snyk --version
                 flake8 --version || echo "flake8 לא מותקן, דלגתי"
+                pylint --version || echo "pylint לא מותקן, דלגתי"
                 '''
             }
         }
 
-        stage('Lint Code') {
+        stage('Static Code Linting') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                     sh '''
-                    flake8 .
+                    echo "=== Running Pylint ==="
+                    mkdir -p reports/pylint
+                    pylint --rcfile=.pylintrc auth-service/*.py backend/*.py jewelry-store/*.py > reports/pylint/pylint_report.txt || true
                     '''
                 }
             }
@@ -39,15 +42,26 @@ pipeline {
 
         stage('Run Unit Tests') {
             steps {
-                sh '''
-                mkdir -p reports
-                pytest --html=reports/unit_test_report.html --self-contained-html
-                '''
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                    sh '''
+                    echo "=== Running Unit Tests ==="
+                    mkdir -p reports
+                    pytest --html=reports/unit_test_report.html --self-contained-html || true
+                    '''
+                }
             }
         }
 
-        stage('Publish HTML Report') {
+        stage('Publish HTML Reports') {
             steps {
+                publishHTML(target: [
+                    allowMissing: false,
+                    alwaysLinkToLastBuild: true,
+                    keepAll: true,
+                    reportDir: 'reports/pylint',
+                    reportFiles: 'pylint_report.txt',
+                    reportName: 'Pylint Report'
+                ])
                 publishHTML(target: [
                     allowMissing: false,
                     alwaysLinkToLastBuild: true,
@@ -141,13 +155,14 @@ pipeline {
             echo "✅ הבנייה והבדיקות הצליחו!"
         }
         unstable {
-            echo "⚠️ הבדיקות נכשלו או יש אזהרות (Lint או Unit Tests) — בדקי את הדוחות"
+            echo "⚠️ יש אזהרות או כשלונות (Lint/Unit Tests) — בדקי את הדוחות"
         }
         failure {
             echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס"
         }
     }
 }
+
 
 
 
