@@ -4,6 +4,7 @@ pipeline {
         SNYK_TOKEN = credentials('SNYK_TOKEN')
         PYTHONPATH = "${WORKSPACE}"
     }
+
     stages {
         stage('Checkout SCM') {
             steps {
@@ -28,26 +29,32 @@ pipeline {
             }
         }
 
-        stage('Static Code Linting') {
-            steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    sh '''
-                    echo "=== Running Pylint ==="
-                    mkdir -p reports/pylint
-                    pylint --rcfile=.pylintrc auth-service/*.py backend/*.py jewelry-store/*.py > reports/pylint/pylint_report.txt || true
-                    '''
+        stage('Static Analysis') {
+            parallel {
+                stage('🔍 Static Code Linting (Pylint)') {
+                    steps {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                            sh '''
+                            echo "=== Running Pylint ==="
+                            mkdir -p reports/pylint
+                            pylint --rcfile=.pylintrc auth-service/*.py backend/*.py jewelry-store/*.py > reports/pylint/pylint_report.txt || true
+                            echo "Pylint analysis complete. Report saved to reports/pylint/pylint_report.txt"
+                            '''
+                        }
+                    }
                 }
-            }
-        }
 
-        stage('Run Unit Tests') {
-            steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    sh '''
-                    echo "=== Running Unit Tests ==="
-                    mkdir -p reports
-                    pytest --html=reports/unit_test_report.html --self-contained-html || true
-                    '''
+                stage('🧪 Unit Tests (Pytest)') {
+                    steps {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                            sh '''
+                            echo "=== Running Unit Tests ==="
+                            mkdir -p reports
+                            pytest --html=reports/unit_test_report.html --self-contained-html || true
+                            echo "Unit tests completed. HTML report generated."
+                            '''
+                        }
+                    }
                 }
             }
         }
@@ -152,7 +159,7 @@ pipeline {
             '''
         }
         success {
-            echo "✅ הבנייה והבדיקות הצליחו!"
+            echo "✅ כל השלבים (לרבות Static Analysis) הושלמו בהצלחה!"
         }
         unstable {
             echo "⚠️ יש אזהרות או כשלונות (Lint/Unit Tests) — בדקי את הדוחות"
@@ -162,6 +169,7 @@ pipeline {
         }
     }
 }
+
 
 
 
