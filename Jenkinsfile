@@ -1,14 +1,15 @@
 pipeline {
-    agent { label 'jenkins-agent' }
+    agent { label 'jenkins-agent' } 
     environment {
         SNYK_TOKEN = credentials('SNYK_TOKEN')
         PYTHONPATH = "${WORKSPACE}"
-        DOCKER_REGISTRY = "localhost:5000" // כתובת ה-Nexus שלך
     }
 
     stages {
         stage('Checkout SCM') {
-            steps { checkout scm }
+            steps {
+                checkout scm
+            }
         }
 
         stage('Prepare Environment') {
@@ -37,10 +38,12 @@ pipeline {
                             echo "=== Running Pylint ==="
                             mkdir -p reports/pylint
                             pylint --rcfile=.pylintrc auth-service/*.py backend/*.py jewelry-store/*.py > reports/pylint/pylint_report.txt || true
+                            echo "Pylint analysis complete. Report saved to reports/pylint/pylint_report.txt"
                             '''
                         }
                     }
                 }
+
                 stage('🧪 Unit Tests (Pytest)') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
@@ -48,6 +51,7 @@ pipeline {
                             echo "=== Running Unit Tests ==="
                             mkdir -p reports
                             pytest --html=reports/unit_test_report.html --self-contained-html || true
+                            echo "Unit tests completed. HTML report generated."
                             '''
                         }
                     }
@@ -85,7 +89,7 @@ pipeline {
             }
         }
 
-        stage('Build & Push Services to Docker Hub') {
+        stage('Build & Push Services') {
             steps {
                 script {
                     def services = [
@@ -94,42 +98,18 @@ pipeline {
                         [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.']
                     ]
 
-                    withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker',
-                                                     usernameVariable: 'DOCKER_USER',
+                    // Docker Hub credentials
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker', 
+                                                     usernameVariable: 'DOCKER_USER', 
                                                      passwordVariable: 'DOCKER_PASS')]) {
                         sh 'docker login -u $DOCKER_USER -p $DOCKER_PASS'
+
                         for (s in services) {
                             sh """
-                            echo "=== Build & Push ${s.name} to Docker Hub ==="
+                            echo "=== Build & Push ${s.name} ==="
                             docker build -f ${s.dockerfile} -t ${s.name} ${s.context}
                             docker tag ${s.name} $DOCKER_USER/${s.name}:latest
                             docker push $DOCKER_USER/${s.name}:latest
-                            """
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('Build & Push Services to Nexus') {
-            steps {
-                script {
-                    def services = [
-                        [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth', context: '.'],
-                        [name: 'backend', dockerfile: 'infra/Dockerfile.backend', context: '.'],
-                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.']
-                    ]
-
-                    withCredentials([usernamePassword(credentialsId: 'nexus-docker-credentials',
-                                                     usernameVariable: 'DOCKER_USER',
-                                                     passwordVariable: 'DOCKER_PASS')]) {
-                        sh 'echo $DOCKER_PASS | docker login $DOCKER_REGISTRY -u $DOCKER_USER --password-stdin'
-
-                        for (s in services) {
-                            sh """
-                            echo "=== Push ${s.name} to Nexus ==="
-                            docker tag ${s.name} ${DOCKER_REGISTRY}/${s.name}:latest
-                            docker push ${DOCKER_REGISTRY}/${s.name}:latest
                             """
                         }
                     }
@@ -141,27 +121,59 @@ pipeline {
             steps {
                 script {
                     def images = [
-                        [name: 'auth-service'],
-                        [name: 'backend'],
-                        [name: 'jewelry-store']
+                        [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth'],
+                        [name: 'backend', dockerfile: 'infra/Dockerfile.backend'],
+                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend']
                     ]
 
-                    withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker',
-                                                     usernameVariable: 'DOCKER_USER',
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker', 
+                                                     usernameVariable: 'DOCKER_USER', 
                                                      passwordVariable: 'DOCKER_PASS')]) {
                         for (img in images) {
                             sh """
                             echo "=== Snyk Test ${img.name} ==="
                             snyk container test $DOCKER_USER/${img.name}:latest \
+                                --file=${img.dockerfile} \
                                 --org=nofar-int \
                                 --ignore-file=./snyk-ignore.txt || true
 
                             echo "=== Snyk Monitor ${img.name} ==="
                             snyk container monitor $DOCKER_USER/${img.name}:latest \
+                                --file=${img.dockerfile} \
                                 --org=nofar-int \
                                 --ignore-file=./snyk-ignore.txt || true
                             """
                         }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy App') {
+            steps {
+                script {
+                    def services = [
+                        [name: 'auth-service', tag: 'latest'],
+                        [name: 'backend', tag: 'latest'],
+                        [name: 'jewelry-store', tag: 'latest']
+                    ]
+
+                    // Nexus credentials
+                    withCredentials([usernamePassword(credentialsId: 'nexus-docker-credentials',
+                                                     usernameVariable: 'NEXUS_USER',
+                                                     passwordVariable: 'NEXUS_PASS')]) {
+                        sh 'docker login localhost:5000 -u $NEXUS_USER -p $NEXUS_PASS'
+
+                        for (s in services) {
+                            sh """
+                                echo "=== Pull & Run ${s.name} from Nexus ==="
+                                docker pull localhost:5000/${s.name}:${s.tag}
+                                docker rm -f ${s.name} || true
+                                docker run -d --name ${s.name} -p 8001:8001 localhost:5000/${s.name}:${s.tag}
+                            """
+                        }
+
+                        sh 'docker logout localhost:5000'
                     }
                 }
             }
@@ -177,11 +189,18 @@ pipeline {
             docker logout || true
             '''
         }
-        success { echo "✅ כל השלבים הושלמו בהצלחה!" }
-        unstable { echo "⚠️ יש אזהרות או כשלונות (Lint/Unit Tests) — בדקי את הדוחות" }
-        failure { echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס" }
+        success {
+            echo "✅ כל השלבים (לרבות Static Analysis) הושלמו בהצלחה!"
+        }
+        unstable {
+            echo "⚠️ יש אזהרות או כשלונות (Lint/Unit Tests) — בדקי את הדוחות"
+        }
+        failure {
+            echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס"
+        }
     }
 }
+
 
 
 
