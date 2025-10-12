@@ -3,6 +3,7 @@ pipeline {
     environment {
         SNYK_TOKEN = credentials('SNYK_TOKEN')
         PYTHONPATH = "${WORKSPACE}"
+        DOCKER_REGISTRY = "localhost:5000" // כתובת ה-Nexus שלך
     }
 
     stages {
@@ -83,8 +84,8 @@ pipeline {
         stage('Clean Old Containers & Images') {
             steps {
                 sh '''
-                docker rm -f auth-service backend jewelry-store || true
-                docker rmi -f auth-service backend jewelry-store || true
+                docker rm -f auth-service backend jewelry-store agent-service || true
+                docker rmi -f auth-service backend jewelry-store agent-service || true
                 '''
             }
         }
@@ -95,20 +96,20 @@ pipeline {
                     def services = [
                         [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth', context: '.'],
                         [name: 'backend', dockerfile: 'infra/Dockerfile.backend', context: '.'],
-                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.']
+                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.'],
+                        [name: 'agent-service', dockerfile: 'ci/Dockerfile.agent', context: '.']
                     ]
 
                     withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker', 
                                                      usernameVariable: 'DOCKER_USER', 
                                                      passwordVariable: 'DOCKER_PASS')]) {
-                        sh 'docker login -u $DOCKER_USER -p $DOCKER_PASS'
+                        sh 'docker login -u $DOCKER_USER -p $DOCKER_PASS $DOCKER_REGISTRY'
 
                         for (s in services) {
                             sh """
                             echo "=== Build & Push ${s.name} ==="
-                            docker build -f ${s.dockerfile} -t ${s.name} ${s.context}
-                            docker tag ${s.name} $DOCKER_USER/${s.name}:latest
-                            docker push $DOCKER_USER/${s.name}:latest
+                            docker build -f ${s.dockerfile} -t $DOCKER_REGISTRY/${s.name}:latest ${s.context}
+                            docker push $DOCKER_REGISTRY/${s.name}:latest
                             """
                         }
                     }
@@ -122,7 +123,8 @@ pipeline {
                     def images = [
                         [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth'],
                         [name: 'backend', dockerfile: 'infra/Dockerfile.backend'],
-                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend']
+                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend'],
+                        [name: 'agent-service', dockerfile: 'ci/Dockerfile.agent']
                     ]
 
                     withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker', 
@@ -131,13 +133,13 @@ pipeline {
                         for (img in images) {
                             sh """
                             echo "=== Snyk Test ${img.name} ==="
-                            snyk container test $DOCKER_USER/${img.name}:latest \
+                            snyk container test $DOCKER_REGISTRY/${img.name}:latest \
                                 --file=${img.dockerfile} \
                                 --org=nofar-int \
                                 --ignore-file=./snyk-ignore.txt || true
 
                             echo "=== Snyk Monitor ${img.name} ==="
-                            snyk container monitor $DOCKER_USER/${img.name}:latest \
+                            snyk container monitor $DOCKER_REGISTRY/${img.name}:latest \
                                 --file=${img.dockerfile} \
                                 --org=nofar-int \
                                 --ignore-file=./snyk-ignore.txt || true
@@ -147,19 +149,34 @@ pipeline {
                 }
             }
         }
+
+        stage('Deploy App') {
+            steps {
+                sh '''
+                echo "=== Deploying Services ==="
+                docker pull $DOCKER_REGISTRY/auth-service:latest
+                docker pull $DOCKER_REGISTRY/backend:latest
+                docker pull $DOCKER_REGISTRY/jewelry-store:latest
+                docker pull $DOCKER_REGISTRY/agent-service:latest
+
+                # הרצת השירותים עם docker-compose (לפי docker-compose.yml קיים)
+                docker-compose up -d
+                '''
+            }
+        }
     }
 
     post {
         always {
             sh '''
             echo "ניקוי משאבים סופי..."
-            docker rm -f auth-service backend jewelry-store || true
-            docker rmi -f auth-service backend jewelry-store || true
+            docker rm -f auth-service backend jewelry-store agent-service || true
+            docker rmi -f auth-service backend jewelry-store agent-service || true
             docker logout || true
             '''
         }
         success {
-            echo "✅ כל השלבים (לרבות Static Analysis) הושלמו בהצלחה!"
+            echo "✅ כל השלבים הושלמו בהצלחה!"
         }
         unstable {
             echo "⚠️ יש אזהרות או כשלונות (Lint/Unit Tests) — בדקי את הדוחות"
@@ -169,6 +186,7 @@ pipeline {
         }
     }
 }
+
 
 
 
