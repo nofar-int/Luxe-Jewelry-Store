@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'jenkins-agent' } 
+    agent { label 'jenkins-agent' }
     environment {
         SNYK_TOKEN = credentials('SNYK_TOKEN')
         PYTHONPATH = "${WORKSPACE}"
@@ -8,9 +8,7 @@ pipeline {
 
     stages {
         stage('Checkout SCM') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
         stage('Prepare Environment') {
@@ -39,12 +37,10 @@ pipeline {
                             echo "=== Running Pylint ==="
                             mkdir -p reports/pylint
                             pylint --rcfile=.pylintrc auth-service/*.py backend/*.py jewelry-store/*.py > reports/pylint/pylint_report.txt || true
-                            echo "Pylint analysis complete. Report saved to reports/pylint/pylint_report.txt"
                             '''
                         }
                     }
                 }
-
                 stage('🧪 Unit Tests (Pytest)') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
@@ -52,7 +48,6 @@ pipeline {
                             echo "=== Running Unit Tests ==="
                             mkdir -p reports
                             pytest --html=reports/unit_test_report.html --self-contained-html || true
-                            echo "Unit tests completed. HTML report generated."
                             '''
                         }
                     }
@@ -84,32 +79,57 @@ pipeline {
         stage('Clean Old Containers & Images') {
             steps {
                 sh '''
-                docker rm -f auth-service backend jewelry-store agent-service || true
-                docker rmi -f auth-service backend jewelry-store agent-service || true
+                docker rm -f auth-service backend jewelry-store || true
+                docker rmi -f auth-service backend jewelry-store || true
                 '''
             }
         }
 
-        stage('Build & Push Services') {
+        stage('Build & Push Services to Docker Hub') {
             steps {
                 script {
                     def services = [
                         [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth', context: '.'],
                         [name: 'backend', dockerfile: 'infra/Dockerfile.backend', context: '.'],
-                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.'],
-                        [name: 'agent-service', dockerfile: 'ci/Dockerfile.agent', context: '.']
+                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.']
                     ]
 
-                    withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker', 
-                                                     usernameVariable: 'DOCKER_USER', 
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker',
+                                                     usernameVariable: 'DOCKER_USER',
                                                      passwordVariable: 'DOCKER_PASS')]) {
-                        sh 'docker login -u $DOCKER_USER -p $DOCKER_PASS $DOCKER_REGISTRY'
+                        sh 'docker login -u $DOCKER_USER -p $DOCKER_PASS'
+                        for (s in services) {
+                            sh """
+                            echo "=== Build & Push ${s.name} to Docker Hub ==="
+                            docker build -f ${s.dockerfile} -t ${s.name} ${s.context}
+                            docker tag ${s.name} $DOCKER_USER/${s.name}:latest
+                            docker push $DOCKER_USER/${s.name}:latest
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build & Push Services to Nexus') {
+            steps {
+                script {
+                    def services = [
+                        [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth', context: '.'],
+                        [name: 'backend', dockerfile: 'infra/Dockerfile.backend', context: '.'],
+                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.']
+                    ]
+
+                    withCredentials([usernamePassword(credentialsId: 'nexus-docker-credentials',
+                                                     usernameVariable: 'DOCKER_USER',
+                                                     passwordVariable: 'DOCKER_PASS')]) {
+                        sh 'echo $DOCKER_PASS | docker login $DOCKER_REGISTRY -u $DOCKER_USER --password-stdin'
 
                         for (s in services) {
                             sh """
-                            echo "=== Build & Push ${s.name} ==="
-                            docker build -f ${s.dockerfile} -t $DOCKER_REGISTRY/${s.name}:latest ${s.context}
-                            docker push $DOCKER_REGISTRY/${s.name}:latest
+                            echo "=== Push ${s.name} to Nexus ==="
+                            docker tag ${s.name} ${DOCKER_REGISTRY}/${s.name}:latest
+                            docker push ${DOCKER_REGISTRY}/${s.name}:latest
                             """
                         }
                     }
@@ -121,26 +141,23 @@ pipeline {
             steps {
                 script {
                     def images = [
-                        [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth'],
-                        [name: 'backend', dockerfile: 'infra/Dockerfile.backend'],
-                        [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend'],
-                        [name: 'agent-service', dockerfile: 'ci/Dockerfile.agent']
+                        [name: 'auth-service'],
+                        [name: 'backend'],
+                        [name: 'jewelry-store']
                     ]
 
-                    withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker', 
-                                                     usernameVariable: 'DOCKER_USER', 
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker',
+                                                     usernameVariable: 'DOCKER_USER',
                                                      passwordVariable: 'DOCKER_PASS')]) {
                         for (img in images) {
                             sh """
                             echo "=== Snyk Test ${img.name} ==="
-                            snyk container test $DOCKER_REGISTRY/${img.name}:latest \
-                                --file=${img.dockerfile} \
+                            snyk container test $DOCKER_USER/${img.name}:latest \
                                 --org=nofar-int \
                                 --ignore-file=./snyk-ignore.txt || true
 
                             echo "=== Snyk Monitor ${img.name} ==="
-                            snyk container monitor $DOCKER_REGISTRY/${img.name}:latest \
-                                --file=${img.dockerfile} \
+                            snyk container monitor $DOCKER_USER/${img.name}:latest \
                                 --org=nofar-int \
                                 --ignore-file=./snyk-ignore.txt || true
                             """
@@ -149,43 +166,23 @@ pipeline {
                 }
             }
         }
-
-        stage('Deploy App') {
-            steps {
-                sh '''
-                echo "=== Deploying Services ==="
-                docker pull $DOCKER_REGISTRY/auth-service:latest
-                docker pull $DOCKER_REGISTRY/backend:latest
-                docker pull $DOCKER_REGISTRY/jewelry-store:latest
-                docker pull $DOCKER_REGISTRY/agent-service:latest
-
-                # הרצת השירותים עם docker-compose (לפי docker-compose.yml קיים)
-                docker-compose up -d
-                '''
-            }
-        }
     }
 
     post {
         always {
             sh '''
             echo "ניקוי משאבים סופי..."
-            docker rm -f auth-service backend jewelry-store agent-service || true
-            docker rmi -f auth-service backend jewelry-store agent-service || true
+            docker rm -f auth-service backend jewelry-store || true
+            docker rmi -f auth-service backend jewelry-store || true
             docker logout || true
             '''
         }
-        success {
-            echo "✅ כל השלבים הושלמו בהצלחה!"
-        }
-        unstable {
-            echo "⚠️ יש אזהרות או כשלונות (Lint/Unit Tests) — בדקי את הדוחות"
-        }
-        failure {
-            echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס"
-        }
+        success { echo "✅ כל השלבים הושלמו בהצלחה!" }
+        unstable { echo "⚠️ יש אזהרות או כשלונות (Lint/Unit Tests) — בדקי את הדוחות" }
+        failure { echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס" }
     }
 }
+
 
 
 
