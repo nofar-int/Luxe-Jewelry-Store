@@ -38,7 +38,7 @@ pipeline {
         stage('Static Analysis') {
             parallel {
 
-                stage('🔹 Shared Library: Pylint Linting') {
+                stage('🔍 Shared Library Linting (Pylint)') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                             script {
@@ -53,7 +53,7 @@ pipeline {
                     }
                 }
 
-                stage('🔹 Shared Library: Pytest Unit Tests') {
+                stage('🧪 Shared Library Unit Tests (Pytest)') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                             script {
@@ -157,7 +157,7 @@ pipeline {
             }
         }
 
-        stage('Deploy App (via Docker Compose)') {
+        stage('🔹 Deploy to Nexus Registry') {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: 'nexus-docker-credentials',
@@ -166,17 +166,22 @@ pipeline {
                         sh '''
                             echo "=== Logging into Nexus Registry ==="
                             docker login localhost:5000 -u $NEXUS_USER -p $NEXUS_PASS
-
-                            echo "=== Deploying stack using Docker-Compose ==="
-                            docker-compose down || true
-                            docker-compose build
-                            docker-compose up -d
-
-                            echo "=== Containers currently running ==="
-                            docker ps
                         '''
                     }
                 }
+            }
+        }
+
+        stage('Deploy App (via Docker Compose)') {
+            steps {
+                sh '''
+                    echo "=== Deploying stack using Docker-Compose ==="
+                    docker-compose down || true
+                    docker-compose build
+                    docker-compose up -d
+                    echo "=== Containers currently running ==="
+                    docker ps
+                '''
             }
         }
     }
@@ -199,3 +204,4 @@ pipeline {
         }
     }
 }
+
