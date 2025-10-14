@@ -29,6 +29,8 @@ pipeline {
                     node --version
                     npm --version
                     snyk --version
+                    pylint --version
+                    pytest --version
                 '''
             }
         }
@@ -42,6 +44,8 @@ pipeline {
                             script {
                                 echo "=== Running Pylint via Shared Library ==="
                                 sh 'mkdir -p reports/pylint'
+
+                                // קריאה לפונקציה מה-shared library
                                 lintPython(
                                     "auth-service/*.py backend/*.py jewelry-store/*.py",
                                     "reports/pylint/pylint_report.txt"
@@ -57,6 +61,8 @@ pipeline {
                             script {
                                 echo "=== Running Unit Tests via Shared Library ==="
                                 sh 'mkdir -p reports'
+
+                                // קריאה לפונקציה מה-shared library להרצת pytest ויצירת דוח HTML
                                 runPytest("reports/unit_test_report.html")
                             }
                         }
@@ -67,7 +73,7 @@ pipeline {
 
         stage('Publish HTML Reports') {
             steps {
-                /* שימוש בפלאגין מובנה publishHTML */
+                // שימוש בפלאגין מובנה publishHTML
                 publishHTML([
                     allowMissing: true,
                     alwaysLinkToLastBuild: true,

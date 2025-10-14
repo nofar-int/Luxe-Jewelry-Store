@@ -15,6 +15,14 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
 # התקנת Snyk CLI
 RUN npm install -g snyk@latest
 
+# התקנת pylint, pytest ו-pytest-html בתוך virtual environment
+RUN python3 -m venv /opt/jenkins_venv && \
+    /opt/jenkins_venv/bin/pip install --upgrade pip setuptools wheel && \
+    /opt/jenkins_venv/bin/pip install pylint pytest pytest-html
+
+# הוספת venv ל-PATH
+ENV PATH="/opt/jenkins_venv/bin:$PATH"
+
 # ✅ התקנת Docker Compose (גרסה בינארית רשמית)
 RUN curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
     -o /usr/local/bin/docker-compose && \
