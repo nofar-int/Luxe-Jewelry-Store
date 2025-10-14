@@ -1,22 +1,29 @@
-// הגדרת השימוש ב-shared library (שם הספריה כפי שהוגדרה ב-Jenkins)
+/* 
+ * שימוש ב-Shared Library שהוגדרה בג'נקינס תחת "Global Pipeline Libraries"
+ * שם הספרייה ב-@Library צריך להיות בדיוק כמו שהגדרת בג'נקינס UI
+ */
 @Library('jenkins-shared-library') _
 
+
 pipeline {
-    agent { label 'jenkins-agent' }
+    agent { label 'jenkins-agent' }  /* מציין שעל הפייפליין לרוץ על agent בשם jenkins-agent */
 
     environment {
+        /* משתני סביבה גלובליים — כאן נשמר טוקן של Snyk, ו-PYTHONPATH */
         SNYK_TOKEN = credentials('SNYK_TOKEN')
         PYTHONPATH = "${WORKSPACE}"
     }
 
     stages {
 
+        /* === שלב ראשון: משיכת קוד מה-SCM (GitHub) === */
         stage('Checkout SCM') {
             steps {
                 checkout scm
             }
         }
 
+        /* === שלב שני: בדיקת סביבת עבודה והתקנות בסיסיות === */
         stage('Prepare Environment') {
             steps {
                 sh '''
@@ -33,29 +40,38 @@ pipeline {
             }
         }
 
+        /* === שלב שלישי: בדיקות סטטיות והרצת טסטים === */
         stage('Static Analysis') {
             parallel {
 
+                /* תת-שלב ראשון: בדיקת איכות קוד עם pylint */
                 stage('🔍 Static Code Linting (Pylint)') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                             script {
                                 echo "=== Running Pylint ==="
                                 mkdir -p reports/pylint
-                                // שימוש בפונקציה מה-shared library
-                                lintPython("auth-service/*.py backend/*.py jewelry-store/*.py", "reports/pylint/pylint_report.txt")
+
+                                /*
+                                 * קריאה לפונקציה מה-shared library
+                                 * הפונקציה תקבל את הנתיב לקבצי הקוד ואת מיקום הדוח
+                                 */
+                                lintPython("auth-service/*.py backend/*.py jewelry-store/*.py", 
+                                           "reports/pylint/pylint_report.txt")
                             }
                         }
                     }
                 }
 
+                /* תת-שלב שני: הרצת Unit Tests עם pytest */
                 stage('🧪 Unit Tests (Pytest)') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                             script {
                                 echo "=== Running Unit Tests ==="
                                 mkdir -p reports
-                                // שימוש בפונקציה מה-shared library
+
+                                /* קריאה לפונקציה מה-shared library להרצת pytest ויצירת דוח HTML */
                                 runPytest("reports/unit_test_report.html")
                             }
                         }
@@ -64,16 +80,18 @@ pipeline {
             }
         }
 
+        /* === שלב רביעי: פרסום דוחות בדפדפן Jenkins === */
         stage('Publish HTML Reports') {
             steps {
                 script {
-                    // שימוש בפונקציה מה-shared library אם היא קיימת
+                    /* שימוש בפונקציה מה-shared library, אם קיימת */
                     publishReports('reports/pylint/pylint_report.txt', 'Pylint Report')
                     publishReports('reports/unit_test_report.html', 'Unit Test Report')
                 }
             }
         }
 
+        /* === שלב חמישי: ניקוי קונטיינרים ותמונות ישנות לפני בנייה חדשה === */
         stage('Clean Old Containers & Images') {
             steps {
                 sh '''
@@ -84,20 +102,24 @@ pipeline {
             }
         }
 
+        /* === שלב שישי: בנייה ודחיפת תמונות לדוקר האב (Docker Hub) === */
         stage('Build & Push Services') {
             steps {
                 script {
+                    /* רשימת השירותים עם הנתיבים לדוקרפיילים */
                     def services = [
                         [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth', context: '.'],
                         [name: 'backend', dockerfile: 'infra/Dockerfile.backend', context: '.'],
                         [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.']
                     ]
 
+                    /* שימוש בפרטי ההתחברות ל-Docker Hub מה-Credentials ב-Jenkins */
                     withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker',
                                                      usernameVariable: 'DOCKER_USER',
                                                      passwordVariable: 'DOCKER_PASS')]) {
                         sh 'docker login -u $DOCKER_USER -p $DOCKER_PASS'
 
+                        /* לולאה העוברת על כל השירותים, בונה ודוחפת את התמונות */
                         for (s in services) {
                             sh """
                             echo "=== Build & Push ${s.name} ==="
@@ -111,6 +133,7 @@ pipeline {
             }
         }
 
+        /* === שלב שביעי: סריקות אבטחה עם Snyk === */
         stage('Snyk Security Scan & Monitor') {
             steps {
                 script {
@@ -143,6 +166,7 @@ pipeline {
             }
         }
 
+        /* === שלב שמיני: Deploy של האפליקציה בעזרת Docker Compose === */
         stage('Deploy App (via Docker Compose)') {
             steps {
                 script {
@@ -167,6 +191,7 @@ pipeline {
         }
     }
 
+    /* === חלק סופי: שלב post המופעל תמיד === */
     post {
         always {
             sh '''
@@ -185,3 +210,4 @@ pipeline {
         }
     }
 }
+
