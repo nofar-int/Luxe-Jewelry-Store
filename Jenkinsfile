@@ -1,4 +1,4 @@
-// הגדרת השימוש ב-shared library (שם הספריה כפי שהגדרת ב-Jenkins)
+// הגדרת השימוש ב-shared library (שם הספריה כפי שהוגדרה ב-Jenkins)
 @Library('jenkins-shared-library') _
 
 pipeline {
@@ -35,15 +35,16 @@ pipeline {
 
         stage('Static Analysis') {
             parallel {
+
                 stage('🔍 Static Code Linting (Pylint)') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                            sh '''
-                            echo "=== Running Pylint ==="
-                            mkdir -p reports/pylint
-                            // שימוש בפונקציה מה-shared library
-                            lintPython("auth-service/*.py backend/*.py jewelry-store/*.py", "reports/pylint/pylint_report.txt")
-                            '''
+                            script {
+                                echo "=== Running Pylint ==="
+                                mkdir -p reports/pylint
+                                // שימוש בפונקציה מה-shared library
+                                lintPython("auth-service/*.py backend/*.py jewelry-store/*.py", "reports/pylint/pylint_report.txt")
+                            }
                         }
                     }
                 }
@@ -51,12 +52,12 @@ pipeline {
                 stage('🧪 Unit Tests (Pytest)') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                            sh '''
-                            echo "=== Running Unit Tests ==="
-                            mkdir -p reports
-                            // שימוש בפונקציה מה-shared library
-                            runPytest("reports/unit_test_report.html")
-                            '''
+                            script {
+                                echo "=== Running Unit Tests ==="
+                                mkdir -p reports
+                                // שימוש בפונקציה מה-shared library
+                                runPytest("reports/unit_test_report.html")
+                            }
                         }
                     }
                 }
@@ -65,9 +66,11 @@ pipeline {
 
         stage('Publish HTML Reports') {
             steps {
-                // אפשר גם להשתמש בפונקציה מה-shared library אם הגדרת
-                publishReports('reports/pylint/pylint_report.txt', 'Pylint Report')
-                publishReports('reports/unit_test_report.html', 'Unit Test Report')
+                script {
+                    // שימוש בפונקציה מה-shared library אם היא קיימת
+                    publishReports('reports/pylint/pylint_report.txt', 'Pylint Report')
+                    publishReports('reports/unit_test_report.html', 'Unit Test Report')
+                }
             }
         }
 
@@ -182,12 +185,3 @@ pipeline {
         }
     }
 }
-
-
-
-
-
-
-
-
-
