@@ -1,28 +1,22 @@
-/* 
- * שימוש ב-Shared Library שהוגדרה בג'נקינס תחת "Global Pipeline Libraries"
- * שם הספרייה ב-@Library צריך להיות בדיוק כמו שהגדרת בג'נקינס UI
- */
 @Library('jenkins-shared-library') _
 
 pipeline {
-    agent { label 'jenkins-agent' }  /* מציין שעל הפייפליין לרוץ על agent בשם jenkins-agent */
+    agent { label 'jenkins-agent' }
 
     environment {
-        /* משתני סביבה גלובליים — כאן נשמר טוקן של Snyk ו-PYTHONPATH */
+        /* משתני סביבה גלובליים */
         SNYK_TOKEN = credentials('SNYK_TOKEN')
         PYTHONPATH = "${WORKSPACE}"
     }
 
     stages {
 
-        /* === שלב ראשון: משיכת קוד מה-SCM (GitHub) === */
         stage('Checkout SCM') {
             steps {
                 checkout scm
             }
         }
 
-        /* === שלב שני: בדיקת סביבת עבודה והתקנות בסיסיות === */
         stage('Prepare Environment') {
             steps {
                 sh '''
@@ -39,57 +33,52 @@ pipeline {
             }
         }
 
-        /* === שלב שלישי: בדיקות סטטיות והרצת טסטים === */
         stage('Static Analysis') {
             parallel {
 
-                /* תת-שלב ראשון: בדיקת איכות קוד עם pylint */
                 stage('🔍 Static Code Linting (Pylint)') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                            script {
+                            sh '''
                                 echo "=== Running Pylint ==="
-                                sh 'mkdir -p reports/pylint'
-
-                                /* קריאה לפונקציה מה-shared library */
-                                lintPython(
-                                    "auth-service/*.py backend/*.py jewelry-store/*.py",
-                                    "reports/pylint/pylint_report.txt"
-                                )
-                            }
+                                mkdir -p reports/pylint
+                                pylint auth-service/*.py backend/*.py jewelry-store/*.py > reports/pylint/pylint_report.txt || true
+                            '''
                         }
                     }
                 }
 
-                /* תת-שלב שני: הרצת Unit Tests עם pytest */
                 stage('🧪 Unit Tests (Pytest)') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                            script {
+                            sh '''
                                 echo "=== Running Unit Tests ==="
-                                sh 'mkdir -p reports'
-
-                                /* קריאה לפונקציה מה-shared library להרצת pytest ויצירת דוח HTML */
-                                runPytest("reports/unit_test_report.html")
-                            }
+                                mkdir -p reports
+                                pytest --html=reports/unit_test_report.html --self-contained-html || true
+                            '''
                         }
                     }
                 }
             }
         }
 
-        /* === שלב רביעי: פרסום דוחות בדפדפן Jenkins === */
         stage('Publish HTML Reports') {
             steps {
-                script {
-                    /* שימוש בפונקציה מה-shared library, אם קיימת */
-                    publishReports('reports/pylint/pylint_report.txt', 'Pylint Report')
-                    publishReports('reports/unit_test_report.html', 'Unit Test Report')
-                }
+                publishHTML([allowMissing: true,
+                             alwaysLinkToLastBuild: true,
+                             keepAll: true,
+                             reportDir: 'reports/pylint',
+                             reportFiles: 'pylint_report.txt',
+                             reportName: 'Pylint Report'])
+                publishHTML([allowMissing: true,
+                             alwaysLinkToLastBuild: true,
+                             keepAll: true,
+                             reportDir: 'reports',
+                             reportFiles: 'unit_test_report.html',
+                             reportName: 'Unit Test Report'])
             }
         }
 
-        /* === שלב חמישי: ניקוי קונטיינרים ותמונות ישנות לפני בנייה חדשה === */
         stage('Clean Old Containers & Images') {
             steps {
                 sh '''
@@ -100,7 +89,6 @@ pipeline {
             }
         }
 
-        /* === שלב שישי: בנייה ודחיפת תמונות ל-Docker Hub === */
         stage('Build & Push Services') {
             steps {
                 script {
@@ -128,7 +116,6 @@ pipeline {
             }
         }
 
-        /* === שלב שביעי: סריקות אבטחה עם Snyk === */
         stage('Snyk Security Scan & Monitor') {
             steps {
                 script {
@@ -161,7 +148,6 @@ pipeline {
             }
         }
 
-        /* === שלב שמיני: Deploy של האפליקציה בעזרת Docker Compose === */
         stage('Deploy App (via Docker Compose)') {
             steps {
                 script {
@@ -186,7 +172,6 @@ pipeline {
         }
     }
 
-    /* === שלב סופי: פעולות post המופעלות תמיד === */
     post {
         always {
             sh '''
@@ -205,3 +190,4 @@ pipeline {
         }
     }
 }
+
