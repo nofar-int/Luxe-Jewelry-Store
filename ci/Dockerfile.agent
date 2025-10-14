@@ -20,10 +20,10 @@ RUN python3 -m venv /opt/jenkins_venv && \
     /opt/jenkins_venv/bin/pip install --upgrade pip setuptools wheel && \
     /opt/jenkins_venv/bin/pip install pylint pytest pytest-html
 
-# הוספת venv ל-PATH
+# הוספת venv ל-PATH כדי שה-agent ימצא את pylint ו-pytest
 ENV PATH="/opt/jenkins_venv/bin:$PATH"
 
-# ✅ התקנת Docker Compose (גרסה בינארית רשמית)
+# התקנת Docker Compose (גרסה בינארית רשמית)
 RUN curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
     -o /usr/local/bin/docker-compose && \
     chmod +x /usr/local/bin/docker-compose && \
@@ -33,6 +33,7 @@ RUN curl -L "https://github.com/docker/compose/releases/latest/download/docker-c
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 USER jenkins
+
 
 
 

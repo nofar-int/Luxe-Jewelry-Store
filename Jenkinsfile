@@ -4,9 +4,9 @@ pipeline {
     agent { label 'jenkins-agent' }
 
     environment {
-        /* משתני סביבה גלובליים */
         SNYK_TOKEN = credentials('SNYK_TOKEN')
         PYTHONPATH = "${WORKSPACE}"
+        PATH = "/opt/jenkins_venv/bin:$PATH" // PATH ל-venv שבו התקנו pylint/pytest
     }
 
     stages {
@@ -22,7 +22,7 @@ pipeline {
                 sh '''
                     echo "=== בדיקת התקנות בסיסיות ==="
                     docker --version
-                    docker-compose version || true
+                    docker-compose --version || true
                     git --version
                     python3 --version
                     pip3 --version
@@ -44,8 +44,6 @@ pipeline {
                             script {
                                 echo "=== Running Pylint via Shared Library ==="
                                 sh 'mkdir -p reports/pylint'
-
-                                // קריאה לפונקציה מה-shared library
                                 lintPython(
                                     "auth-service/*.py backend/*.py jewelry-store/*.py",
                                     "reports/pylint/pylint_report.txt"
@@ -61,8 +59,6 @@ pipeline {
                             script {
                                 echo "=== Running Unit Tests via Shared Library ==="
                                 sh 'mkdir -p reports'
-
-                                // קריאה לפונקציה מה-shared library להרצת pytest ויצירת דוח HTML
                                 runPytest("reports/unit_test_report.html")
                             }
                         }
@@ -73,7 +69,6 @@ pipeline {
 
         stage('Publish HTML Reports') {
             steps {
-                // שימוש בפלאגין מובנה publishHTML
                 publishHTML([
                     allowMissing: true,
                     alwaysLinkToLastBuild: true,
