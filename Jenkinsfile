@@ -19,7 +19,7 @@ pipeline {
                 sh '''
                 echo "=== בדיקת התקנות בסיסיות ==="
                 docker --version
-                docker compose version || docker-compose version
+                docker-compose version
                 git --version
                 python3 --version
                 pip3 --version
@@ -84,7 +84,7 @@ pipeline {
         stage('Clean Old Containers & Images') {
             steps {
                 sh '''
-                docker compose down || docker-compose down || true
+                docker-compose down || true
                 docker rm -f auth-service backend-service jewelry-store || true
                 docker rmi -f auth-service backend-service jewelry-store || true
                 '''
@@ -160,10 +160,10 @@ pipeline {
                         echo "=== Logging into Nexus Registry ==="
                         docker login localhost:5000 -u $NEXUS_USER -p $NEXUS_PASS
 
-                        echo "=== Deploying stack using Docker Compose ==="
-                        docker compose down || true
-                        docker compose build
-                        docker compose up -d
+                        echo "=== Deploying stack using Docker-Compose ==="
+                        docker-compose down || true
+                        docker-compose build
+                        docker-compose up -d
 
                         echo "=== Containers currently running ==="
                         docker ps
@@ -182,7 +182,7 @@ pipeline {
             '''
         }
         success {
-            echo "✅ כל השלבים הושלמו בהצלחה (כולל Deploy דרך Docker Compose)!"
+            echo "✅ כל השלבים הושלמו בהצלחה (כולל Deploy דרך Docker-Compose)!"
         }
         unstable {
             echo "⚠️ יש אזהרות או כשלונות (Lint/Unit Tests) — בדקי את הדוחות"
@@ -192,6 +192,7 @@ pipeline {
         }
     }
 }
+
 
 
 
