@@ -38,7 +38,7 @@ pipeline {
         stage('Static Analysis') {
             parallel {
 
-                stage('🔍 Static Code Linting (Pylint)') {
+                stage('🔹 Shared Library: Pylint Linting') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                             script {
@@ -53,7 +53,7 @@ pipeline {
                     }
                 }
 
-                stage('🧪 Unit Tests (Pytest)') {
+                stage('🔹 Shared Library: Pytest Unit Tests') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                             script {
