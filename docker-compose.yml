@@ -21,8 +21,8 @@ services:
 
   jewelry-store:
     build:
-      context: ./jewelry-store
-      dockerfile: ../infra/Dockerfile.frontend
+      context: .
+      dockerfile: infra/Dockerfile.frontend
     container_name: jewelry-store
     ports:
       - "3000:3000"

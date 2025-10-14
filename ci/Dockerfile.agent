@@ -7,31 +7,25 @@ RUN apt-get update && \
     apt-get install -y docker.io git python3 python3-pip python3-venv python3-setuptools unzip curl flake8 && \
     rm -rf /var/lib/apt/lists/*
 
-# Node.js + npm
+# התקנת Node.js + npm
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     npm install -g npm@latest
 
-# Snyk CLI
+# התקנת Snyk CLI
 RUN npm install -g snyk@latest
 
-# AWS CLI v2
-RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
-    unzip awscliv2.zip && \
-    ./aws/install --bin-dir /usr/local/bin && \
-    rm -rf aws awscliv2.zip
+# ✅ התקנת Docker Compose (גרסה בינארית רשמית)
+RUN curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+    -o /usr/local/bin/docker-compose && \
+    chmod +x /usr/local/bin/docker-compose && \
+    docker-compose --version
 
-# יצירת virtual environment והתקנת Python packages
-RUN python3 -m venv /opt/venv && \
-    /opt/venv/bin/python -m pip install --upgrade pip && \
-    /opt/venv/bin/pip install pytest pytest-html pylint
-
-# PATH לשימוש בכלים ב־Jenkins
-ENV PATH="/opt/venv/bin:$PATH"
+# ניקוי
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 USER jenkins
 
-WORKDIR /home/jenkins
 
 
 
