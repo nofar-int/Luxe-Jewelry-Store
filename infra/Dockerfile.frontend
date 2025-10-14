@@ -2,12 +2,15 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY  jewelry-store/package*.json ./
+# העתקת קבצי package.json להתקנת התלויות
+COPY package*.json ./
 RUN npm install
+
+# העתקת כל הקבצים של הפרונטנד
 COPY . .
 
-# מאזין לכל ה־IPs ולא רק localhost
 CMD ["npm", "start", "--", "--host", "0.0.0.0"]
+
 
 
 

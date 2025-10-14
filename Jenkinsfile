@@ -1,11 +1,13 @@
 pipeline {
-    agent { label 'jenkins-agent' } 
+    agent { label 'jenkins-agent' }
+
     environment {
         SNYK_TOKEN = credentials('SNYK_TOKEN')
         PYTHONPATH = "${WORKSPACE}"
     }
 
     stages {
+
         stage('Checkout SCM') {
             steps {
                 checkout scm
@@ -17,14 +19,13 @@ pipeline {
                 sh '''
                 echo "=== בדיקת התקנות בסיסיות ==="
                 docker --version
+                docker compose version || docker-compose version
                 git --version
                 python3 --version
                 pip3 --version
                 node --version
                 npm --version
                 snyk --version
-                flake8 --version || echo "flake8 לא מותקן, דלגתי"
-                pylint --version || echo "pylint לא מותקן, דלגתי"
                 '''
             }
         }
@@ -83,8 +84,9 @@ pipeline {
         stage('Clean Old Containers & Images') {
             steps {
                 sh '''
-                docker rm -f auth-service backend jewelry-store || true
-                docker rmi -f auth-service backend jewelry-store || true
+                docker compose down || docker-compose down || true
+                docker rm -f auth-service backend-service jewelry-store || true
+                docker rmi -f auth-service backend-service jewelry-store || true
                 '''
             }
         }
@@ -98,9 +100,8 @@ pipeline {
                         [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.']
                     ]
 
-                    // Docker Hub credentials
-                    withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker', 
-                                                     usernameVariable: 'DOCKER_USER', 
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker',
+                                                     usernameVariable: 'DOCKER_USER',
                                                      passwordVariable: 'DOCKER_PASS')]) {
                         sh 'docker login -u $DOCKER_USER -p $DOCKER_PASS'
 
@@ -126,8 +127,8 @@ pipeline {
                         [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend']
                     ]
 
-                    withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker', 
-                                                     usernameVariable: 'DOCKER_USER', 
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker',
+                                                     usernameVariable: 'DOCKER_USER',
                                                      passwordVariable: 'DOCKER_PASS')]) {
                         for (img in images) {
                             sh """
@@ -149,31 +150,24 @@ pipeline {
             }
         }
 
-        stage('Deploy App') {
+        stage('Deploy App (via Docker Compose)') {
             steps {
                 script {
-                    def services = [
-                        [name: 'auth-service', tag: 'latest'],
-                        [name: 'backend', tag: 'latest'],
-                        [name: 'jewelry-store', tag: 'latest']
-                    ]
-
-                    // Nexus credentials
                     withCredentials([usernamePassword(credentialsId: 'nexus-docker-credentials',
                                                      usernameVariable: 'NEXUS_USER',
                                                      passwordVariable: 'NEXUS_PASS')]) {
-                        sh 'docker login localhost:5000 -u $NEXUS_USER -p $NEXUS_PASS'
+                        sh '''
+                        echo "=== Logging into Nexus Registry ==="
+                        docker login localhost:5000 -u $NEXUS_USER -p $NEXUS_PASS
 
-                        for (s in services) {
-                            sh """
-                                echo "=== Pull & Run ${s.name} from Nexus ==="
-                                docker pull localhost:5000/${s.name}:${s.tag}
-                                docker rm -f ${s.name} || true
-                                docker run -d --name ${s.name} -p 8001:8001 localhost:5000/${s.name}:${s.tag}
-                            """
-                        }
+                        echo "=== Deploying stack using Docker Compose ==="
+                        docker compose down || true
+                        docker compose build
+                        docker compose up -d
 
-                        sh 'docker logout localhost:5000'
+                        echo "=== Containers currently running ==="
+                        docker ps
+                        '''
                     }
                 }
             }
@@ -184,13 +178,11 @@ pipeline {
         always {
             sh '''
             echo "ניקוי משאבים סופי..."
-            docker rm -f auth-service backend jewelry-store || true
-            docker rmi -f auth-service backend jewelry-store || true
             docker logout || true
             '''
         }
         success {
-            echo "✅ כל השלבים (לרבות Static Analysis) הושלמו בהצלחה!"
+            echo "✅ כל השלבים הושלמו בהצלחה (כולל Deploy דרך Docker Compose)!"
         }
         unstable {
             echo "⚠️ יש אזהרות או כשלונות (Lint/Unit Tests) — בדקי את הדוחות"
@@ -200,8 +192,6 @@ pipeline {
         }
     }
 }
-
-
 
 
 
