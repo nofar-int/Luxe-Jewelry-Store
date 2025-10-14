@@ -39,11 +39,16 @@ pipeline {
                 stage('🔍 Static Code Linting (Pylint)') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                            sh '''
-                                echo "=== Running Pylint ==="
-                                mkdir -p reports/pylint
-                                pylint auth-service/*.py backend/*.py jewelry-store/*.py > reports/pylint/pylint_report.txt || true
-                            '''
+                            script {
+                                echo "=== Running Pylint via Shared Library ==="
+                                sh 'mkdir -p reports/pylint'
+
+                                /* קריאה לפונקציה מה-shared library */
+                                lintPython(
+                                    "auth-service/*.py backend/*.py jewelry-store/*.py",
+                                    "reports/pylint/pylint_report.txt"
+                                )
+                            }
                         }
                     }
                 }
@@ -51,11 +56,13 @@ pipeline {
                 stage('🧪 Unit Tests (Pytest)') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                            sh '''
-                                echo "=== Running Unit Tests ==="
-                                mkdir -p reports
-                                pytest --html=reports/unit_test_report.html --self-contained-html || true
-                            '''
+                            script {
+                                echo "=== Running Unit Tests via Shared Library ==="
+                                sh 'mkdir -p reports'
+
+                                /* קריאה לפונקציה מה-shared library להרצת pytest ויצירת דוח HTML */
+                                runPytest("reports/unit_test_report.html")
+                            }
                         }
                     }
                 }
@@ -64,18 +71,10 @@ pipeline {
 
         stage('Publish HTML Reports') {
             steps {
-                publishHTML([allowMissing: true,
-                             alwaysLinkToLastBuild: true,
-                             keepAll: true,
-                             reportDir: 'reports/pylint',
-                             reportFiles: 'pylint_report.txt',
-                             reportName: 'Pylint Report'])
-                publishHTML([allowMissing: true,
-                             alwaysLinkToLastBuild: true,
-                             keepAll: true,
-                             reportDir: 'reports',
-                             reportFiles: 'unit_test_report.html',
-                             reportName: 'Unit Test Report'])
+                script {
+                    publishReports('reports/pylint/pylint_report.txt', 'Pylint Report')
+                    publishReports('reports/unit_test_report.html', 'Unit Test Report')
+                }
             }
         }
 
