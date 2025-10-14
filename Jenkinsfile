@@ -4,12 +4,11 @@
  */
 @Library('jenkins-shared-library') _
 
-
 pipeline {
     agent { label 'jenkins-agent' }  /* מציין שעל הפייפליין לרוץ על agent בשם jenkins-agent */
 
     environment {
-        /* משתני סביבה גלובליים — כאן נשמר טוקן של Snyk, ו-PYTHONPATH */
+        /* משתני סביבה גלובליים — כאן נשמר טוקן של Snyk ו-PYTHONPATH */
         SNYK_TOKEN = credentials('SNYK_TOKEN')
         PYTHONPATH = "${WORKSPACE}"
     }
@@ -27,15 +26,15 @@ pipeline {
         stage('Prepare Environment') {
             steps {
                 sh '''
-                echo "=== בדיקת התקנות בסיסיות ==="
-                docker --version
-                docker-compose version || true
-                git --version
-                python3 --version
-                pip3 --version
-                node --version
-                npm --version
-                snyk --version
+                    echo "=== בדיקת התקנות בסיסיות ==="
+                    docker --version
+                    docker-compose version || true
+                    git --version
+                    python3 --version
+                    pip3 --version
+                    node --version
+                    npm --version
+                    snyk --version
                 '''
             }
         }
@@ -50,14 +49,13 @@ pipeline {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                             script {
                                 echo "=== Running Pylint ==="
-                                mkdir -p reports/pylint
+                                sh 'mkdir -p reports/pylint'
 
-                                /*
-                                 * קריאה לפונקציה מה-shared library
-                                 * הפונקציה תקבל את הנתיב לקבצי הקוד ואת מיקום הדוח
-                                 */
-                                lintPython("auth-service/*.py backend/*.py jewelry-store/*.py", 
-                                           "reports/pylint/pylint_report.txt")
+                                /* קריאה לפונקציה מה-shared library */
+                                lintPython(
+                                    "auth-service/*.py backend/*.py jewelry-store/*.py",
+                                    "reports/pylint/pylint_report.txt"
+                                )
                             }
                         }
                     }
@@ -69,7 +67,7 @@ pipeline {
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                             script {
                                 echo "=== Running Unit Tests ==="
-                                mkdir -p reports
+                                sh 'mkdir -p reports'
 
                                 /* קריאה לפונקציה מה-shared library להרצת pytest ויצירת דוח HTML */
                                 runPytest("reports/unit_test_report.html")
@@ -95,37 +93,34 @@ pipeline {
         stage('Clean Old Containers & Images') {
             steps {
                 sh '''
-                docker-compose down || true
-                docker rm -f auth-service backend-service jewelry-store || true
-                docker rmi -f auth-service backend-service jewelry-store || true
+                    docker-compose down || true
+                    docker rm -f auth-service backend-service jewelry-store || true
+                    docker rmi -f auth-service backend-service jewelry-store || true
                 '''
             }
         }
 
-        /* === שלב שישי: בנייה ודחיפת תמונות לדוקר האב (Docker Hub) === */
+        /* === שלב שישי: בנייה ודחיפת תמונות ל-Docker Hub === */
         stage('Build & Push Services') {
             steps {
                 script {
-                    /* רשימת השירותים עם הנתיבים לדוקרפיילים */
                     def services = [
                         [name: 'auth-service', dockerfile: 'infra/Dockerfile.auth', context: '.'],
                         [name: 'backend', dockerfile: 'infra/Dockerfile.backend', context: '.'],
                         [name: 'jewelry-store', dockerfile: 'infra/Dockerfile.frontend', context: '.']
                     ]
 
-                    /* שימוש בפרטי ההתחברות ל-Docker Hub מה-Credentials ב-Jenkins */
                     withCredentials([usernamePassword(credentialsId: 'docker-hub-nofarpanker',
                                                      usernameVariable: 'DOCKER_USER',
                                                      passwordVariable: 'DOCKER_PASS')]) {
                         sh 'docker login -u $DOCKER_USER -p $DOCKER_PASS'
 
-                        /* לולאה העוברת על כל השירותים, בונה ודוחפת את התמונות */
                         for (s in services) {
                             sh """
-                            echo "=== Build & Push ${s.name} ==="
-                            docker build -f ${s.dockerfile} -t ${s.name} ${s.context}
-                            docker tag ${s.name} $DOCKER_USER/${s.name}:latest
-                            docker push $DOCKER_USER/${s.name}:latest
+                                echo "=== Build & Push ${s.name} ==="
+                                docker build -f ${s.dockerfile} -t ${s.name} ${s.context}
+                                docker tag ${s.name} $DOCKER_USER/${s.name}:latest
+                                docker push $DOCKER_USER/${s.name}:latest
                             """
                         }
                     }
@@ -148,17 +143,17 @@ pipeline {
                                                      passwordVariable: 'DOCKER_PASS')]) {
                         for (img in images) {
                             sh """
-                            echo "=== Snyk Test ${img.name} ==="
-                            snyk container test $DOCKER_USER/${img.name}:latest \
-                                --file=${img.dockerfile} \
-                                --org=nofar-int \
-                                --ignore-file=./snyk-ignore.txt || true
+                                echo "=== Snyk Test ${img.name} ==="
+                                snyk container test $DOCKER_USER/${img.name}:latest \
+                                    --file=${img.dockerfile} \
+                                    --org=nofar-int \
+                                    --ignore-file=./snyk-ignore.txt || true
 
-                            echo "=== Snyk Monitor ${img.name} ==="
-                            snyk container monitor $DOCKER_USER/${img.name}:latest \
-                                --file=${img.dockerfile} \
-                                --org=nofar-int \
-                                --ignore-file=./snyk-ignore.txt || true
+                                echo "=== Snyk Monitor ${img.name} ==="
+                                snyk container monitor $DOCKER_USER/${img.name}:latest \
+                                    --file=${img.dockerfile} \
+                                    --org=nofar-int \
+                                    --ignore-file=./snyk-ignore.txt || true
                             """
                         }
                     }
@@ -174,16 +169,16 @@ pipeline {
                                                      usernameVariable: 'NEXUS_USER',
                                                      passwordVariable: 'NEXUS_PASS')]) {
                         sh '''
-                        echo "=== Logging into Nexus Registry ==="
-                        docker login localhost:5000 -u $NEXUS_USER -p $NEXUS_PASS
+                            echo "=== Logging into Nexus Registry ==="
+                            docker login localhost:5000 -u $NEXUS_USER -p $NEXUS_PASS
 
-                        echo "=== Deploying stack using Docker-Compose ==="
-                        docker-compose down || true
-                        docker-compose build
-                        docker-compose up -d
+                            echo "=== Deploying stack using Docker-Compose ==="
+                            docker-compose down || true
+                            docker-compose build
+                            docker-compose up -d
 
-                        echo "=== Containers currently running ==="
-                        docker ps
+                            echo "=== Containers currently running ==="
+                            docker ps
                         '''
                     }
                 }
@@ -191,12 +186,12 @@ pipeline {
         }
     }
 
-    /* === חלק סופי: שלב post המופעל תמיד === */
+    /* === שלב סופי: פעולות post המופעלות תמיד === */
     post {
         always {
             sh '''
-            echo "ניקוי משאבים סופי..."
-            docker logout || true
+                echo "ניקוי משאבים סופי..."
+                docker logout || true
             '''
         }
         success {
@@ -210,4 +205,3 @@ pipeline {
         }
     }
 }
-
