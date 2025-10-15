@@ -3,10 +3,15 @@
 pipeline {
     agent { label 'jenkins-agent' }
 
+    // 🎯 טריגר אוטומטי — הפייפליין ירוץ כל 2 דקות אם יש שינוי ב־Git
+    triggers {
+        pollSCM('H/2 * * * *')
+    }
+
     environment {
         SNYK_TOKEN = credentials('SNYK_TOKEN')
         PYTHONPATH = "${WORKSPACE}"
-        PATH = "/opt/jenkins_venv/bin:$PATH" // PATH ל-venv שבו התקנו pylint/pytest
+        PATH = "/opt/jenkins_venv/bin:$PATH" // PATH ל־venv שבו הותקנו pylint/pytest
     }
 
     stages {
@@ -91,6 +96,7 @@ pipeline {
         stage('Clean Old Containers & Images') {
             steps {
                 sh '''
+                    echo "=== ניקוי קונטיינרים ותמונות ישנים ==="
                     docker-compose down || true
                     docker rm -f auth-service backend-service jewelry-store || true
                     docker rmi -f auth-service backend-service jewelry-store || true
@@ -175,9 +181,9 @@ pipeline {
         stage('Deploy App (via Docker Compose)') {
             steps {
                 sh '''
-                    echo "=== Deploying stack using Docker-Compose ==="
+                    echo "=== Deploying app using Docker Compose ==="
                     docker-compose down || true
-                    docker-compose build
+                    docker-compose pull
                     docker-compose up -d
                     echo "=== Containers currently running ==="
                     docker ps
@@ -194,13 +200,13 @@ pipeline {
             '''
         }
         success {
-            echo "✅ כל השלבים הושלמו בהצלחה (כולל Deploy דרך Docker-Compose)!"
+            echo "✅ כל השלבים הושלמו בהצלחה (כולל Deploy דרך Docker Compose)!"
         }
         unstable {
-            echo "⚠️ יש אזהרות או כשלונות (Lint/Unit Tests) — בדקי את הדוחות"
+            echo "⚠️ יש אזהרות או כשלונות (Lint/Unit Tests) — בדקי את הדוחות."
         }
         failure {
-            echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס"
+            echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס."
         }
     }
 }

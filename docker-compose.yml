@@ -2,17 +2,13 @@ version: "3.9"
 
 services:
   auth:
-    build:
-      context: .
-      dockerfile: infra/Dockerfile.auth
+    image: nofarpanker/auth-service:latest
     container_name: auth-service
     ports:
       - "8001:8001"
 
   backend:
-    build:
-      context: .
-      dockerfile: infra/Dockerfile.backend
+    image: nofarpanker/backend:latest
     container_name: backend-service
     ports:
       - "8000:8000"
@@ -20,9 +16,7 @@ services:
       - auth
 
   jewelry-store:
-    build:
-      context: .
-      dockerfile: infra/Dockerfile.frontend
+    image: nofarpanker/jewelry-store:latest
     container_name: jewelry-store
     ports:
       - "3000:3000"
