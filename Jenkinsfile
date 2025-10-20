@@ -1,27 +1,37 @@
-@Library('jenkins-shared-library') _
+@Library('jenkins-shared-library') _  // ✅ טוען את הספרייה המשותפת (Shared Library) שיצרנו מראש
 
 pipeline {
-    agent { label 'jenkins-agent' }
+    agent { label 'jenkins-agent' }  // ✅ מריץ את הפייפליין על סוכן (Agent) שמוגדר בשם 'jenkins-agent'
 
-    // 🎯 טריגר אוטומטי — הפייפליין ירוץ כל 2 דקות אם יש שינוי ב־Git
+    // ⚙️ אפשרויות כלליות לפייפליין
+    options {
+        timeout(time: 25, unit: 'MINUTES')  // 🕒 הפייפליין יעצור אוטומטית אחרי 25 דקות כדי למנוע תקיעות
+        buildDiscarder(logRotator(numToKeepStr: '10'))  // 💾 שומר רק את 10 הבניות האחרונות
+        timestamps()  // 🧭 מוסיף חותמות זמן ללוגים
+    }
+
+    // 🎯 טריגר — מריץ את הפייפליין כל 2 דקות אם יש שינוי ב־Git
     triggers {
         pollSCM('H/2 * * * *')
     }
 
+    // 🌍 משתני סביבה
     environment {
-        SNYK_TOKEN = credentials('SNYK_TOKEN')
-        PYTHONPATH = "${WORKSPACE}"
-        PATH = "/opt/jenkins_venv/bin:$PATH" // PATH ל־venv שבו הותקנו pylint/pytest
+        SNYK_TOKEN = credentials('SNYK_TOKEN')  // 🔑 מושך טוקן מאובטח של Snyk מתוך Credentials של Jenkins
+        PYTHONPATH = "${WORKSPACE}"              // 🧩 מוסיף את תיקיית העבודה ל־PYTHONPATH
+        PATH = "/opt/jenkins_venv/bin:$PATH"     // 🐍 מוסיף ל־PATH את ה־venv שבו מותקנים pytest/pylint
     }
 
     stages {
 
+        // 🧾 שלב 1: שליפת קוד מה־Repository
         stage('Checkout SCM') {
             steps {
-                checkout scm
+                checkout scm  // 🔄 שולף את הקוד מה־GitHub או מה־Git remote שהוגדר בג׳נקינס
             }
         }
 
+        // 🧰 שלב 2: בדיקת סביבת העבודה
         stage('Prepare Environment') {
             steps {
                 sh '''
@@ -40,8 +50,9 @@ pipeline {
             }
         }
 
+        // 🧠 שלב 3: אנליזה סטטית והרצת טסטים במקביל (Parallel)
         stage('Static Analysis') {
-            parallel {
+            parallel {  // 🚀 שני שלבים רצים במקביל כדי לחסוך זמן
 
                 stage('🔍 Shared Library Linting (Pylint)') {
                     steps {
@@ -72,6 +83,7 @@ pipeline {
             }
         }
 
+        // 📊 שלב 4: הפקת דוחות HTML
         stage('Publish HTML Reports') {
             steps {
                 publishHTML([
@@ -93,6 +105,7 @@ pipeline {
             }
         }
 
+        // 🧹 שלב 5: ניקוי קונטיינרים ותמונות ישנים
         stage('Clean Old Containers & Images') {
             steps {
                 sh '''
@@ -104,6 +117,7 @@ pipeline {
             }
         }
 
+        // 🏗️ שלב 6: Build & Push לדוקר האב
         stage('Build & Push Services') {
             steps {
                 script {
@@ -131,6 +145,7 @@ pipeline {
             }
         }
 
+        // 🛡️ שלב 7: סריקות אבטחה עם Snyk
         stage('Snyk Security Scan & Monitor') {
             steps {
                 script {
@@ -163,6 +178,7 @@ pipeline {
             }
         }
 
+        // 🏷️ שלב 8: Deploy לרג׳יסטרי של Nexus
         stage('🔹 Deploy to Nexus Registry') {
             steps {
                 script {
@@ -178,6 +194,7 @@ pipeline {
             }
         }
 
+        // 🚀 שלב 9: הפעלת המערכת בפועל בעזרת Docker Compose
         stage('Deploy App (via Docker Compose)') {
             steps {
                 sh '''
@@ -192,6 +209,7 @@ pipeline {
         }
     }
 
+    // 🧩 שלבי POST — מתבצעים תמיד אחרי הפייפליין
     post {
         always {
             sh '''
@@ -203,11 +221,12 @@ pipeline {
             echo "✅ כל השלבים הושלמו בהצלחה (כולל Deploy דרך Docker Compose)!"
         }
         unstable {
-            echo "⚠️ יש אזהרות או כשלונות (Lint/Unit Tests) — בדקי את הדוחות."
+            echo "⚠️ יש אזהרות או כשלונות חלקיים (Lint/Unit Tests) — בדקי את הדוחות."
         }
         failure {
             echo "❌ הבנייה נכשלה — בדקי את הלוגים בג׳נקינס."
         }
     }
 }
+
 
